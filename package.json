@@ -1,0 +1,42 @@
+{
+  "name": "tiamat",
+  "version": "1.0.0",
+  "description": "Tiamat transaction chaining & API layer for Cardano.",
+  "exports": {
+    ".": {
+      "import": "./dist/🕯️.mjs",
+      "require": "./dist/🕯️.js"
+    }
+  },
+  "types": "./dist/🕯️.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup offchain/🕯️.ts --format esm,cjs --dts",
+    "dev": "tsup offchain/🕯️.ts --format esm,cjs --watch --dts",
+    "lint": "eslint \"offchain/**/*.ts*\"",
+    "clean": "rm -rf .turbo && rm -rf node_modules && rm -rf dist",
+    "fmt": "prettier --write .",
+    "fmtplutus": "prettier --write offchain/contract/plutus.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/metadex-fi/tiamat.git"
+  },
+  "author": "Chris M. Hiatt",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/metadex-fi/tiamat/issues"
+  },
+  "homepage": "metadex.fi",
+  "dependencies": {
+    "blakejs": "^1.2.1",
+    "oil": "workspace:*",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13",
+    "@blaze-cardano/blueprint": "workspace:*"
+  }
+}
