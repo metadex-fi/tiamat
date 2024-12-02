@@ -67,7 +67,10 @@ type AsyncMkUserT<
   mkUser: MkUserT<DC, DP, CT, UT, WT>,
 ) => Promise<UT>;
 
-export class TiamatUser<DC extends PDappConfigT, DP extends PDappParamsT> {
+export abstract class TiamatUser<
+  DC extends PDappConfigT,
+  DP extends PDappParamsT,
+> {
   protected static instances = new Map<string, number>();
   protected static singleton?: TiamatUser<any, any>;
 

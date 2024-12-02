@@ -80,7 +80,10 @@ export interface BPAddress {
 /**
  *
  */
-export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
+export abstract class TiamatContract<
+  DC extends PDappConfigT,
+  DP extends PDappParamsT,
+> {
   // public readonly idNFT: MintingPolicy;
   protected static instances = new Map<string, number>();
   public readonly name: string;
