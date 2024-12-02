@@ -64,6 +64,7 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
   private eligibleEVsElectedCache?: boolean;
 
   public static compute<DC extends PDappConfigT, DP extends PDappParamsT>(
+    previous: ElectionData<DC, DP> | `virginal`,
     name: string,
     matrixUtxo: MatrixUtxo,
     nexusUtxo: NexusUtxo<DC, DP>,
@@ -97,6 +98,23 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
 
     let fromMs = forCycle === "current" ? oldFromMs : oldToMs; // milliseconds
 
+    const nexusUtxoTxId = Core.fromHex(
+      nexusUtxo.utxo.core.input().transactionId(),
+    );
+    let hash = new Uint8Array(nexusUtxoTxId.length + 2);
+    hash[1] = Number(nexusUtxo.utxo.core.input().index()); // NOTE wraps around
+    hash.set(nexusUtxoTxId, 2);
+    const seed = Core.toHex(hash);
+
+    if (
+      previous !== `virginal` &&
+      seed === previous.seed &&
+      matrixUtxoString === previous.matrixUtxoString &&
+      fromMs === previous.fromMs &&
+      forCycle === previous.forCycle
+    )
+      return previous;
+
     const lateByMs = BigInt(Date.now()) - oldFromMs;
     if (lateByMs > 0n) {
       const extraCycles = lateByMs / cycleDurationMs;
@@ -105,14 +123,6 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
     const suitableForElection = fromMs >= oldToMs;
     const toMs = fromMs + cycleDurationMs;
 
-    assert(nexusUtxo.utxo, `Elect: no nexusUtxo.utxo`);
-    const nexusUtxoTxId = Core.fromHex(
-      nexusUtxo.utxo.core.input().transactionId(),
-    );
-    let hash = new Uint8Array(nexusUtxoTxId.length + 2);
-    hash[1] = Number(nexusUtxo.utxo.core.input().index()); // NOTE wraps around
-    hash.set(nexusUtxoTxId, 2);
-    const seed = Core.toHex(hash);
     hash[0] = Number(fromMs); // NOTE wraps around
 
     const eligibleEVs: EigenValue[] = [];

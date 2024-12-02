@@ -89,6 +89,7 @@ class MatrixNexusBlocksGanglion<
         Ganglion<any[], InZsT<DC, DP>[number]>,
         InZsT<DC, DP>[number] | "virginal"
       >,
+      _previous: MatrixNexusBlock<DC, DP> | `virginal`,
       _signal: AbortSignal,
     ): Promise<MatrixNexusBlock<DC, DP> | `virginal`> => {
       const maybeMatrix = afferentStates.get(matrixGanglion as any);
@@ -147,6 +148,7 @@ class ElectionGanglion<
         Ganglion<any[], MatrixNexusBlock<DC, DP>>,
         MatrixNexusBlock<DC, DP> | "virginal"
       >,
+      previous: ElectionData<DC, DP> | `virginal`,
       _signal: AbortSignal,
     ): Promise<ElectionData<DC, DP> | `virginal`> => {
       const matrixNexusUtxos = afferentStates.get(
@@ -157,6 +159,7 @@ class ElectionGanglion<
         return Promise.resolve(`virginal`);
       }
       const electionData = ElectionData.compute(
+        previous,
         name,
         matrixNexusUtxos.matrix,
         matrixNexusUtxos.nexus,

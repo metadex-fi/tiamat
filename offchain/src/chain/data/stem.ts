@@ -18,6 +18,7 @@ import { UtxoSource } from "../state/utxoSource";
 
 export const identityProcedure = async <ZT extends Zygote>(
   afferentStates: Map<Ganglion<any[], ZT>, ZT | `virginal`>,
+  _previous: ZT | `virginal`,
   _signal: AbortSignal,
 ): Promise<ZT | `virginal`> => {
   // await new Promise((resolve) => setTimeout(resolve, 0));

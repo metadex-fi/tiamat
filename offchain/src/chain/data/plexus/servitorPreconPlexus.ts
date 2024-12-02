@@ -39,6 +39,7 @@ export class ServitorPreconPlexus<
         Ganglion<WalletFunds[], WalletFunds>,
         WalletFunds | `virginal`
       >,
+      _previous: WalletsFundsStatus | `virginal`,
       _signal: AbortSignal,
     ): Promise<WalletsFundsStatus | `virginal`> => {
       const servitorFunds = afferentStates.get(

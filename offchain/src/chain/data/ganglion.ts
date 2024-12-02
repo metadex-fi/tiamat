@@ -38,6 +38,7 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
         Ganglion<any[], InZsT[number]>,
         InZsT[number] | "virginal"
       >,
+      previous: OutZT | `virginal`,
       signal: AbortSignal,
     ) => Promise<OutZT | "virginal">,
   ) {
@@ -63,11 +64,7 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
   // public endpoints
 
   public get scion(): OutZT | `virginal` {
-    if (this.current === `virginal`) {
-      return `virginal`;
-    } else {
-      return this.current;
-    }
+    return this.current;
   }
 
   /**
@@ -149,6 +146,7 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
     try {
       const newState = await this.procedure(
         new Map(this.afferentsCache),
+        this.current,
         signal,
       );
       if (newState === `virginal`) {
