@@ -98,6 +98,11 @@ export abstract class Intent<
     );
     this.status = `pending`;
     this.updateDisplay(this.conflux, this.status);
+
+    // for blocking during election-margins
+    const actionId = await this.user.actionSemaphore.latch(this.name);
+    this.user.actionSemaphore.discharge(actionId);
+
     let fix: FixFoldPhase<DC, DP> = {
       fixWallet: `ok` as `ok` | `servitor` | `owner`,
       fixTx: (tx: Tx) => tx,

@@ -16,6 +16,10 @@ import { errorTimeoutMs, numTxFees } from "../../utils/constants";
 import { WalletFundsPlexus } from "../data/plexus/walletFundsPlexus";
 import { ServitorPreconPlexus } from "../data/plexus/servitorPreconPlexus";
 import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
+import { Semaphore } from "./semaphore";
+import { Effector } from "../data/effector";
+import { Callback } from "../state/callback";
+import { BlockHeight } from "../data/zygote";
 
 type MkContractT<
   DC extends PDappConfigT,
@@ -41,6 +45,7 @@ type MkUserT<
 > = (
   name: string,
   contract: CT,
+  socketClient: SocketClient,
   ownerBlaze: Blaze<Provider, WT>,
   servitorBlaze: Blaze<Provider, HotWallet>,
   servitorAddress: Bech32Address,
@@ -54,6 +59,7 @@ type AsyncMkUserT<
   WT extends BlazeWallet,
 > = (
   name: string,
+  socketClient: SocketClient,
   utxoSource: UtxoSource,
   networkId: Core.NetworkId,
   blockfrost: Provider,
@@ -80,6 +86,11 @@ export abstract class TiamatUser<
   public readonly servitorFundsPlexus: WalletFundsPlexus<DC, DP>;
   public readonly ownerFundsPlexus: WalletFundsPlexus<DC, DP>;
   public readonly servitorPreconPlexus: ServitorPreconPlexus<DC, DP>;
+
+  // mainly for blocking during election-margins
+  public readonly actionSemaphore = new Semaphore(`Action`);
+
+  private marginLockId?: string;
 
   /**
    *
@@ -139,6 +150,7 @@ export abstract class TiamatUser<
     });
     TiamatUser.singleton = await asyncMkUser(
       name,
+      socketClient,
       utxoSource,
       networkId,
       blockfrost,
@@ -209,6 +221,7 @@ export abstract class TiamatUser<
     const utxoSource = UtxoSource.newTestingInstance(socketClient);
     return await asyncMkUser(
       name,
+      socketClient,
       utxoSource,
       networkId,
       blockfrost,
@@ -242,6 +255,7 @@ export abstract class TiamatUser<
     WT extends BlazeWallet,
   >(
     name: string,
+    socketClient: SocketClient,
     utxoSource: UtxoSource,
     networkId: Core.NetworkId,
     blockfrost: Provider,
@@ -305,6 +319,7 @@ export abstract class TiamatUser<
     const user = mkUser(
       name,
       contract,
+      socketClient,
       ownerBlaze,
       servitorBlaze,
       servitorAddress,
@@ -338,6 +353,7 @@ export abstract class TiamatUser<
   protected constructor(
     public readonly name: string,
     public readonly contract: TiamatContract<DC, DP>,
+    socketClient: SocketClient,
     protected readonly ownerBlaze: Blaze<P, W>,
     protected readonly servitorBlaze: Blaze<P, W>,
     public readonly servitorAddress: Bech32Address,
@@ -365,6 +381,33 @@ export abstract class TiamatUser<
       this.servitorFundsPlexus,
       this.ownerFundsPlexus,
     );
+
+    this.contract.blocksPlexus.blocksGanglion.innervateEffector(
+      new Effector(
+        new Callback(
+          `always`,
+          [`${this.name}`, `unlockAfterMargins`],
+          (_data: BlockHeight, _trace: Trace) => {
+            if (this.marginLockId) {
+              this.actionSemaphore.discharge(this.marginLockId);
+              this.marginLockId = undefined;
+              return Promise.resolve([
+                `${this.name}.unblockAfterMargins: margin lock discharged`,
+              ]);
+            } else {
+              return Promise.resolve([
+                `${this.name}.unblockAfterMargins: no margin lock to discharge`,
+              ]);
+            }
+          },
+        ),
+      ),
+    );
+
+    this.contract.electionsPlexus.innervateEffectors(
+      this.lockDuringMargins,
+      socketClient.updateConnections,
+    );
   }
 
   protected myelinate = (from: string[]) => {
@@ -373,6 +416,15 @@ export abstract class TiamatUser<
     this.ownerFundsPlexus.myelinate(from_);
     this.servitorPreconPlexus.myelinate(from_);
     this.contract.myelinate(from_);
+  };
+
+  protected lockDuringMargins = async () => {
+    assert(
+      !this.marginLockId,
+      `${this.name}.lockDuringMargins: margin lock already latched`,
+    );
+    this.marginLockId = await this.actionSemaphore.latch(`lockDuringMargins`);
+    return [`${this.name}.lockDuringMargins: margin lock latched`];
   };
 
   public newTx = async (ofWallet: `servitor` | `owner`): Promise<Tx> => {

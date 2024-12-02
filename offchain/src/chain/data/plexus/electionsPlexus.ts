@@ -296,8 +296,8 @@ export class ElectionsPlexus<
   public readonly currentElectionPrecon: ElectionPrecon<DC, DP>;
   public readonly nextElectionPrecon: ElectionPrecon<DC, DP>;
   private electionEffectors?: {
-    current: CurrentElectionEffector<DC, DP>;
-    next: NextElectionEffector<DC, DP>;
+    currentElectionEffector: CurrentElectionEffector<DC, DP>;
+    nextElectionEffector: NextElectionEffector<DC, DP>;
   };
 
   constructor(
@@ -381,8 +381,8 @@ export class ElectionsPlexus<
     ) as Effector<ElectionData<DC, DP>>;
 
     this.electionEffectors = {
-      current: currentElectionEffector,
-      next: nextElectionEffector,
+      currentElectionEffector,
+      nextElectionEffector,
     };
 
     this.currentElectionGanglion.innervateEffector(currentElectionEffector);

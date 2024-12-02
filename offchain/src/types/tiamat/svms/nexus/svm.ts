@@ -5,7 +5,7 @@ import { PNexusAction } from "./action";
 import { PNexusConfig } from "./config";
 import { PNexusState } from "./state";
 
-export const mkPnexusDatum = <DC extends PDappConfigT, DP extends PDappParamsT>(
+export const mkPNexusDatum = <DC extends PDappConfigT, DP extends PDappParamsT>(
   pdappConfig: DC,
   pdappParams: DP,
 ) => new PSvmDatum(new PNexusConfig(pdappConfig), new PNexusState(pdappParams));

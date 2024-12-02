@@ -25,7 +25,7 @@ import {
 } from "../../types/tiamat/svms/matrix/svm";
 import {
   pnexusRedeemer,
-  mkPnexusDatum,
+  mkPNexusDatum,
 } from "../../types/tiamat/svms/nexus/svm";
 import {
   pvestingRedeemer,
@@ -168,7 +168,7 @@ export abstract class TiamatContract<
       nexusID,
       false,
       pnexusRedeemer,
-      mkPnexusDatum(pdappConfig, pdappParams),
+      mkPNexusDatum(pdappConfig, pdappParams),
       true,
     );
     this.nexusPlexus = new SvmSingletonPlexus(this.nexus);
