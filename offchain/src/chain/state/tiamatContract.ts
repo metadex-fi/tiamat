@@ -32,7 +32,6 @@ import {
   pvestingDatum,
 } from "../../types/tiamat/svms/vesting/svm";
 import {
-  slotDurationMs,
   callbackTimeoutMs,
   blockDurationMs,
   errorTimeoutMs,
@@ -246,72 +245,6 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
     this.blocksPlexus.myelinate(from_);
     this.electionsPlexus.myelinate(from_);
   };
-
-  /**
-   *
-   */
-  public startWatchingElection_ = async () => {
-    assert(this.startElectionLoopTimeout, `dummy cannot start election loop`);
-    this.startElectionLoopTimeout.clear();
-    assert(!this.electionLoopActive, `election loop already active`);
-    this.electionLoopActive = true;
-
-    this.utxoSource.subscribeToNewBlock(
-      this,
-      new Callback(
-        `always`,
-        [this.name, `startWatchingElection`, `newBlock`],
-        async (block, trace) => {
-          const prefix = `new block: ${block}`;
-          this.log(
-            `${prefix} (${this.blocksUntilNextCheck} blocks until next check)`,
-          );
-          let result: string[];
-          if (this.blocksUntilNextCheck > 1) {
-            this.blocksUntilNextCheck -= 1;
-            result = [
-              `${prefix}, waiting for next election check in ${this.blocksUntilNextCheck} blocks`,
-            ];
-          } else if (this.blocksUntilNextCheck === 1) {
-            assert(
-              this.untilNextCheckMs,
-              `${this.name}: untilNextCheckMs not initialized`,
-            );
-            this.queueElectionCheck(this.untilNextCheckMs, "next", trace);
-            this.blocksUntilNextCheck -= 1;
-            result = [
-              `${prefix}, queueing next election check in ${
-                this.untilNextCheckMs / slotDurationMs
-              } slots`,
-            ];
-          } else if (this.marginDurationMs > 0) {
-            // this.electionCheck("current");
-            // result = [
-            //   `${prefix}, checking current election`,
-            // ];
-            const timeout = this.marginDurationMs / 2;
-            this.queueElectionCheck(timeout, "current", trace);
-            result = [
-              `${prefix}, queueing current election check in ${
-                timeout / slotDurationMs
-              } slots`,
-            ];
-          } else {
-            result = [`${prefix}, no election checks queued`];
-          }
-          return await Promise.resolve(result);
-        },
-      ),
-    );
-  };
-
-  // /**
-  //  *
-  //  */
-  // public stopWatchingElection = () => {
-  //   this.electionLoopActive = false;
-  //   this.clearTimeouts();
-  // };
 
   /**
    *

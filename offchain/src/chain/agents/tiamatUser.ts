@@ -17,6 +17,56 @@ import { WalletFundsPlexus } from "../data/plexus/walletFundsPlexus";
 import { ServitorPreconPlexus } from "../data/plexus/servitorPreconPlexus";
 import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
 
+type MkContractT<
+  DC extends PDappConfigT,
+  DP extends PDappParamsT,
+  CT extends TiamatContract<DC, DP>,
+> = (
+  name: string,
+  networkId: Core.NetworkId,
+  utxoSource: UtxoSource,
+  nexusID: Token,
+  matrixID: Token,
+  matrixNexusTolerance: number,
+  pdappConfig: DC,
+  pdappParams: DP,
+) => CT;
+
+type MkUserT<
+  DC extends PDappConfigT,
+  DP extends PDappParamsT,
+  CT extends TiamatContract<DC, DP>,
+  UT extends TiamatUser<DC, DP>,
+  WT extends BlazeWallet,
+> = (
+  name: string,
+  contract: CT,
+  ownerBlaze: Blaze<Provider, WT>,
+  servitorBlaze: Blaze<Provider, HotWallet>,
+  servitorAddress: Bech32Address,
+) => UT;
+
+type AsyncMkUserT<
+  DC extends PDappConfigT,
+  DP extends PDappParamsT,
+  CT extends TiamatContract<DC, DP>,
+  UT extends TiamatUser<DC, DP>,
+  WT extends BlazeWallet,
+> = (
+  name: string,
+  utxoSource: UtxoSource,
+  networkId: Core.NetworkId,
+  blockfrost: Provider,
+  ownerBlaze: Blaze<Provider, WT>,
+  servitorBlaze: Blaze<Provider, HotWallet>,
+  nexusID: Token,
+  matrixID: Token,
+  pdappConfig: DC,
+  pdappParams: DP,
+  mkContract: MkContractT<DC, DP, CT>,
+  mkUser: MkUserT<DC, DP, CT, UT, WT>,
+) => Promise<UT>;
+
 export class TiamatUser<DC extends PDappConfigT, DP extends PDappParamsT> {
   protected static instances = new Map<string, number>();
   protected static singleton?: TiamatUser<any, any>;
@@ -40,10 +90,13 @@ export class TiamatUser<DC extends PDappConfigT, DP extends PDappParamsT> {
    * @param servitorPKey
    */
   protected static async createSingleton<
-    UserT extends TiamatUser<DC, DP>,
     DC extends PDappConfigT,
     DP extends PDappParamsT,
+    CT extends TiamatContract<DC, DP>,
+    UT extends TiamatUser<DC, DP>,
+    WT extends BlazeWallet,
   >(
+    name: string,
     provider: Provider,
     networkId: Core.NetworkId,
     blockfrostNetworkId:
@@ -54,23 +107,14 @@ export class TiamatUser<DC extends PDappConfigT, DP extends PDappParamsT> {
     blockfrostProjectId: string,
     nexusID: Token,
     matrixID: Token,
-    ownerWallet: BlazeWallet,
+    ownerWallet: WT,
     servitorPKey: Core.Bip32PrivateKeyHex,
     pdappConfig: DC,
     pdappParams: DP,
-    anew: (
-      ownerBlaze: Blaze<Provider, BlazeWallet>,
-      servitorBlaze: Blaze<Provider, HotWallet>,
-      socketClient: SocketClient<DC, DP>,
-      utxoSource: UtxoSource,
-      blockfrost: Provider,
-      nexusID: Token,
-      matrixID: Token,
-      networkId: Core.NetworkId,
-      pdappConfig: DC,
-      pdappParams: DP,
-    ) => Promise<UserT>,
-  ): Promise<UserT> {
+    mkContract: MkContractT<DC, DP, CT>,
+    mkUser: MkUserT<DC, DP, CT, UT, WT>,
+    asyncMkUser: AsyncMkUserT<DC, DP, CT, UT, WT>,
+  ): Promise<UT> {
     assert(!TiamatUser.singleton, `singleton already exists`);
 
     const servitorWallet = await HotWallet.fromMasterkey(
@@ -83,26 +127,28 @@ export class TiamatUser<DC extends PDappConfigT, DP extends PDappParamsT> {
       Blaze.from(provider, servitorWallet),
     ]);
 
-    const socketClient = SocketClient.createSingleton();
+    const socketClient = SocketClient.createSingleton(name);
     const utxoSource = UtxoSource.createSocketSingleton(socketClient);
 
     const blockfrost = new Blockfrost({
       network: blockfrostNetworkId,
       projectId: blockfrostProjectId,
     });
-    TiamatUser.singleton = await anew(
+    TiamatUser.singleton = await asyncMkUser(
+      name,
+      utxoSource,
+      networkId,
+      blockfrost,
       ownerBlaze,
       servitorBlaze,
-      socketClient,
-      utxoSource,
-      blockfrost,
       nexusID,
       matrixID,
-      networkId,
       pdappConfig,
       pdappParams,
+      mkContract,
+      mkUser,
     );
-    return TiamatUser.singleton as UserT;
+    return TiamatUser.singleton as UT;
   }
 
   /**
@@ -127,54 +173,52 @@ export class TiamatUser<DC extends PDappConfigT, DP extends PDappParamsT> {
    * @param servitorPKey
    * @param port
    */
-  protected static mkNewTestingInstance_ =
-    <
-      UserT extends TiamatUser<DC, DP>,
-      DC extends PDappConfigT,
-      DP extends PDappParamsT,
-    >(
-      anew: (
-        ownerBlaze: Blaze<Provider, BlazeWallet>,
-        servitorBlaze: Blaze<Provider, HotWallet>,
-        socketClient: SocketClient<DC, DP>,
-        utxoSource: UtxoSource,
-        blockfrost: Provider,
-        nexusID: Token,
-        matrixID: Token,
-        networkId: Core.NetworkId,
-      ) => Promise<UserT>,
-    ) =>
-    async (
-      provider: Provider,
-      networkId: Core.NetworkId,
-      blockfrost: Provider, // for the initial utxos required to bootstrap the rest of the system
-      nexusID: Token,
-      matrixID: Token,
-      ownerPKey: Core.Bip32PrivateKeyHex,
-      servitorPKey: Core.Bip32PrivateKeyHex,
-      port: number,
-    ): Promise<UserT> => {
-      const [ownerWallet, servitorWallet] = await Promise.all([
-        HotWallet.fromMasterkey(ownerPKey, provider, networkId),
-        HotWallet.fromMasterkey(servitorPKey, provider, networkId),
-      ]);
-      const [ownerBlaze, servitorBlaze] = await Promise.all([
-        Blaze.from(provider, ownerWallet),
-        Blaze.from(provider, servitorWallet),
-      ]);
-      const socketClient = SocketClient.newTestingInstance(port);
-      const utxoSource = UtxoSource.newTestingInstance(socketClient);
-      return await anew(
-        ownerBlaze,
-        servitorBlaze,
-        socketClient,
-        utxoSource,
-        blockfrost,
-        nexusID,
-        matrixID,
-        networkId,
-      );
-    };
+  protected static newTestingInstance = async <
+    DC extends PDappConfigT,
+    DP extends PDappParamsT,
+    UT extends TiamatUser<DC, DP>,
+    CT extends TiamatContract<DC, DP>,
+  >(
+    name: string,
+    provider: Provider,
+    networkId: Core.NetworkId,
+    blockfrost: Provider, // for the initial utxos required to bootstrap the rest of the system
+    nexusID: Token,
+    matrixID: Token,
+    ownerPKey: Core.Bip32PrivateKeyHex,
+    servitorPKey: Core.Bip32PrivateKeyHex,
+    port: number,
+    pdappConfig: DC,
+    pdappParams: DP,
+    mkContract: MkContractT<DC, DP, CT>,
+    mkUser: MkUserT<DC, DP, CT, UT, HotWallet>,
+    asyncMkUser: AsyncMkUserT<DC, DP, CT, UT, HotWallet>,
+  ): Promise<UT> => {
+    const [ownerWallet, servitorWallet] = await Promise.all([
+      HotWallet.fromMasterkey(ownerPKey, provider, networkId),
+      HotWallet.fromMasterkey(servitorPKey, provider, networkId),
+    ]);
+    const [ownerBlaze, servitorBlaze] = await Promise.all([
+      Blaze.from(provider, ownerWallet),
+      Blaze.from(provider, servitorWallet),
+    ]);
+    const socketClient = SocketClient.newTestingInstance(name, port);
+    const utxoSource = UtxoSource.newTestingInstance(socketClient);
+    return await asyncMkUser(
+      name,
+      utxoSource,
+      networkId,
+      blockfrost,
+      ownerBlaze,
+      servitorBlaze,
+      nexusID,
+      matrixID,
+      pdappConfig,
+      pdappParams,
+      mkContract,
+      mkUser,
+    );
+  };
 
   /**
    *
@@ -187,129 +231,98 @@ export class TiamatUser<DC extends PDappConfigT, DP extends PDappParamsT> {
    * @param matrixID
    * @param networkId
    */
-  protected static mkAnew =
-    <
-      UserT extends TiamatUser<DC, DP>,
-      ContractT extends TiamatContract<DC, DP>,
-      UserWallet extends BlazeWallet,
-      DC extends PDappConfigT,
-      DP extends PDappParamsT,
-    >(
-      pdappConfig: DC,
-      pdappParams: DP,
-      mkContract: (
-        name: string,
-        networkId: Core.NetworkId,
-        utxoSource: UtxoSource,
-        nexusID: Token,
-        matrixID: Token,
-        matrixNexusTolerance: number,
-        pdappConfig: DC,
-        pdappParams: DP,
-      ) => ContractT,
-      mkUser: (
-        contract: ContractT,
-        ownerBlaze: Blaze<Provider, UserWallet>,
-        servitorBlaze: Blaze<Provider, HotWallet>,
-        name: string,
-        servitorAddress: Bech32Address,
-      ) => UserT,
-    ) =>
-    async (
-      ownerBlaze: Blaze<Provider, UserWallet>,
-      servitorBlaze: Blaze<Provider, HotWallet>,
-      socketClient: SocketClient<DC, DP>,
-      utxoSource: UtxoSource,
-      blockfrost: Provider,
-      nexusID: Token,
-      matrixID: Token,
-      networkId: Core.NetworkId,
-    ): Promise<UserT> => {
-      // TODO we can't rely on addresses, we need to switch to wallets (multiple addresses per wallet)
-      const [blazeOwnerAddresses, blazeServitorAddresses] = await Promise.all([
-        ownerBlaze.wallet.getUsedAddresses(),
-        servitorBlaze.wallet.getUsedAddresses(),
-      ]);
+  protected static asyncNew = async <
+    DC extends PDappConfigT,
+    DP extends PDappParamsT,
+    CT extends TiamatContract<DC, DP>,
+    UT extends TiamatUser<DC, DP>,
+    WT extends BlazeWallet,
+  >(
+    name: string,
+    utxoSource: UtxoSource,
+    networkId: Core.NetworkId,
+    blockfrost: Provider,
+    ownerBlaze: Blaze<Provider, WT>,
+    servitorBlaze: Blaze<Provider, HotWallet>,
+    nexusID: Token,
+    matrixID: Token,
+    pdappConfig: DC,
+    pdappParams: DP,
+    mkContract: MkContractT<DC, DP, CT>,
+    mkUser: MkUserT<DC, DP, CT, UT, WT>,
+  ): Promise<UT> => {
+    // TODO we can't rely on addresses, we need to switch to wallets (multiple addresses per wallet)
+    // const [blazeOwnerAddresses, blazeServitorAddresses] = await Promise.all([
+    //   ownerBlaze.wallet.getUsedAddresses(),
+    //   servitorBlaze.wallet.getUsedAddresses(),
+    // ]);
 
-      let name = `${blazeOwnerAddresses[0]!.toBech32().slice(-4)}.${blazeServitorAddresses[0]!
-        .toBech32()
-        .slice(-4)} User`;
-      const instance = TiamatUser.instances.get(name) ?? 0;
-      TiamatUser.instances.set(name, instance + 1);
-      if (instance) name = `${name}#${instance}`;
+    // let name = `${blazeOwnerAddresses[0]!.toBech32().slice(-4)}.${blazeServitorAddresses[0]!
+    //   .toBech32()
+    //   .slice(-4)} User`;
+    const instance = TiamatUser.instances.get(name) ?? 0;
+    TiamatUser.instances.set(name, instance + 1);
+    if (instance) name = `${name}#${instance}`;
 
-      // ownerBlaze.name = `${name} Owner Blaze`;
-      // servitorBlaze.name = `${name} Servitor Blaze`;
-      utxoSource.setName(name);
+    utxoSource.setName(name);
 
-      // arbitrarily using ownerBlaze here (need this only for some conversions in the constructor)
-      const contract = mkContract(
-        name,
-        networkId,
-        utxoSource,
-        nexusID,
-        matrixID,
-        1, // TODO 0 might break it, but maybe the error was somewhere else so we don't need this tolerance mechanism
-        pdappConfig,
-        pdappParams,
-      );
+    const contract = mkContract(
+      name,
+      networkId,
+      utxoSource,
+      nexusID,
+      matrixID,
+      1, // TODO 0 might break it, but maybe the error was somewhere else so we don't need this tolerance mechanism
+      pdappConfig,
+      pdappParams,
+    );
 
-      // const ownerAddress = Address.fromBlaze(blazeOwnerAddress);
-      // const servitorAddress = Address.fromBlaze(blazeServitorAddress);
+    const [matrixUtxos, nexusUtxos] = await Promise.all([
+      blockfrost.getUnspentOutputs(contract.matrix.address.blaze),
+      blockfrost.getUnspentOutputs(contract.nexus.address.blaze),
+    ]);
+    assert(
+      matrixUtxos.length === 1,
+      `${name}: expected exactly one matrix utxo, got ${matrixUtxos.length}`,
+    );
+    assert(
+      nexusUtxos.length === 1,
+      `${name}: expected exactly one nexus utxo, got ${nexusUtxos.length}`,
+    );
 
-      const [matrixUtxos, nexusUtxos] = await Promise.all([
-        blockfrost.getUnspentOutputs(contract.matrix.address.blaze),
-        blockfrost.getUnspentOutputs(contract.nexus.address.blaze),
-      ]);
-      assert(
-        matrixUtxos.length === 1,
-        `${name}: expected exactly one matrix utxo, got ${matrixUtxos.length}`,
-      );
-      assert(
-        nexusUtxos.length === 1,
-        `${name}: expected exactly one nexus utxo, got ${nexusUtxos.length}`,
-      );
-      socketClient.initialize(name, contract);
+    const servitorAddresses = await servitorBlaze.wallet.getUsedAddresses();
+    assert(
+      servitorAddresses.length === 1,
+      `servitorAddresses.length !== 1: ${servitorAddresses.length}`,
+    );
+    const servitorAddress = await Bech32Address.fromHotWallet(
+      servitorBlaze.wallet,
+    );
 
-      // await utxoSource.initialNotifyUtxoEvents([
-      //   matrixUtxos[0],
-      //   nexusUtxos[0],
-      // ], Trace.source(`INIT`, `${name}.new`));
+    const user = mkUser(
+      name,
+      contract,
+      ownerBlaze,
+      servitorBlaze,
+      servitorAddress,
+    );
 
-      const servitorAddresses = await servitorBlaze.wallet.getUsedAddresses();
-      assert(
-        servitorAddresses.length === 1,
-        `servitorAddresses.length !== 1: ${servitorAddresses.length}`,
-      );
-      const servitorAddress = await Bech32Address.fromHotWallet(
-        servitorBlaze.wallet,
-      );
+    await utxoSource.initialNotifyUtxoEvents(
+      UtxoSet.fromList([
+        {
+          core: matrixUtxos[0]!,
+          trace: Trace.source(`INIT`, name),
+        },
+        {
+          core: nexusUtxos[0]!,
+          trace: Trace.source(`INIT`, name),
+        },
+      ]),
+      Trace.source(`INIT`, `${name}.new`),
+    );
 
-      const user = mkUser(
-        contract,
-        ownerBlaze,
-        servitorBlaze,
-        name,
-        servitorAddress,
-      );
-      await contract.startWatchingElection();
-
-      await utxoSource.initialNotifyUtxoEvents(
-        UtxoSet.fromList([
-          {
-            core: matrixUtxos[0]!,
-            trace: Trace.source(`INIT`, name),
-          },
-          {
-            core: nexusUtxos[0]!,
-            trace: Trace.source(`INIT`, name),
-          },
-        ]),
-        Trace.source(`INIT`, `${name}.new`),
-      );
-
-      return user;
-    };
+    return user;
+  };
 
   /**
    *
@@ -320,10 +333,10 @@ export class TiamatUser<DC extends PDappConfigT, DP extends PDappParamsT> {
    * @param servitorAddress
    */
   protected constructor(
+    public readonly name: string,
     public readonly contract: TiamatContract<DC, DP>,
     protected readonly ownerBlaze: Blaze<P, W>,
     protected readonly servitorBlaze: Blaze<P, W>,
-    public readonly name: string,
     public readonly servitorAddress: Bech32Address,
   ) {
     // this.actionSemaphore = new Semaphore(`${this.name} Action`);

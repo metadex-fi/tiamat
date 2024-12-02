@@ -77,8 +77,8 @@ export class ServitorPreconPlexus<
     );
   }
 
-  myelinate(from: string[]): void {
+  public myelinate = (from: string[]): void => {
     const from_ = [...from, `ServitorPreconPlexus`];
     this.walletsFundsGanglion.myelinate(from_);
-  }
+  };
 }

@@ -1,7 +1,6 @@
 import assert from "assert";
 import { Core } from "@blaze-cardano/sdk";
 import { AssocMap } from "../../types/general/fundamental/container/map";
-import { TiamatContract } from "../state/tiamatContract";
 import {
   ChainInterface,
   Sent,
@@ -22,7 +21,7 @@ import {
   UntippedTxMsg,
   UtxoEventMsg,
 } from "../state/messages";
-import { EigenvectorData, IpPort } from "../state/electionData";
+import { EigenvectorData, ElectionData, IpPort } from "../state/electionData";
 import { f } from "../../types/general/fundamental/type";
 import { errorTimeoutMs, maxUserMsgDelay } from "../../utils/constants";
 import { Bech32Address, Trace } from "../../utils/wrappers";
@@ -71,11 +70,10 @@ export interface Confirmations {
 /**
  *
  */
-export class SocketClient<DC extends PDappConfigT, DP extends PDappParamsT>
-  implements ChainInterface
-{
+export class SocketClient implements ChainInterface {
   private static instances = new Map<string, number>();
-  private name4 = `!!! CLIENT NOT INITIALIZED !!!`;
+  // private name = `!!! CLIENT NOT INITIALIZED !!!`;
+  public readonly name: string;
   private readonly socketType = `client`;
   private readonly vectorSockets: AssocMap<IpPort, WebSocket> = new AssocMap(
     (ip) => `${ip.ip}:${ip.port}`,
@@ -92,15 +90,21 @@ export class SocketClient<DC extends PDappConfigT, DP extends PDappParamsT>
   private readonly ackSubscribers: Set<UtxoSource> = new Set();
   private numSupportVectors?: bigint;
 
-  private static singleton?: SocketClient<any, any>;
+  private static singleton?: SocketClient;
 
   /**
    *
    * @param port
    */
   private constructor(
+    name: string,
     private readonly port: number, // for testing
-  ) {}
+  ) {
+    this.name = `${name} SocketClient`;
+    const instance = SocketClient.instances.get(this.name) ?? 0;
+    SocketClient.instances.set(this.name, instance + 1);
+    if (instance) this.name = `${this.name}#${instance}`;
+  }
 
   //////////////////////////////////////////
   // public endpoints
@@ -109,63 +113,39 @@ export class SocketClient<DC extends PDappConfigT, DP extends PDappParamsT>
    *
    * @param port
    */
-  public static newTestingInstance<
-    DC extends PDappConfigT,
-    DP extends PDappParamsT,
-  >(port: number): SocketClient<DC, DP> {
-    return new SocketClient(port);
+  public static newTestingInstance(name: string, port: number): SocketClient {
+    return new SocketClient(name, port);
   }
 
   /**
    *
    */
-  public static createSingleton<
-    DC extends PDappConfigT,
-    DP extends PDappParamsT,
-  >(): SocketClient<DC, DP> {
+  public static createSingleton(name: string): SocketClient {
     assert(!SocketClient.singleton, `singleton already exists`);
     const port = 0;
-    SocketClient.singleton = new SocketClient(port);
+    SocketClient.singleton = new SocketClient(name, port);
     return SocketClient.singleton;
   }
 
   /**
    *
    */
-  public static getSingleton<
-    DC extends PDappConfigT,
-    DP extends PDappParamsT,
-  >(): SocketClient<DC, DP> {
+  public static getSingleton(): SocketClient {
     assert(SocketClient.singleton, `singleton does not exist`);
     return SocketClient.singleton;
   }
 
-  /**
-   *
-   * @param name4
-   * @param contract
-   */
-  public initialize = (name4: string, contract: TiamatContract<DC, DP>) => {
-    this.name4 = `${name4} SocketClient`;
-    const instance = SocketClient.instances.get(this.name4) ?? 0;
-    SocketClient.instances.set(this.name4, instance + 1);
-    if (instance) this.name4 = `${this.name4}#${instance}`;
-
-    // TODO for current cycle upon startup as well
-    // TODO and the election semaphore thing
-    contract.subscribeToElection(
-      new Callback(
-        `always`,
-        [this.name4, `initialize`, `subscribeToElection`],
-        async (election, _trace) => {
-          this.numSupportVectors = election.tiamatParams.num_support_vectors;
-          this.vectorData = election.eligibleEVsValencies;
-          const newVectorIpPorts = [...this.vectorData.keys()];
-          this.updateVectorConnections(newVectorIpPorts);
-          return await Promise.resolve([`election processed`]);
-        },
-      ),
-    );
+  public updateConnections = async <
+    DC extends PDappConfigT,
+    DP extends PDappParamsT,
+  >(
+    election: ElectionData<DC, DP>,
+  ): Promise<(string | Sent)[]> => {
+    this.numSupportVectors = election.tiamatParams.num_support_vectors;
+    this.vectorData = election.eligibleEVsValencies;
+    const newVectorIpPorts = [...this.vectorData.keys()];
+    this.updateVectorConnections(newVectorIpPorts);
+    return await Promise.resolve([`${this.name}: connections updated`]);
   };
 
   /**
@@ -424,7 +404,7 @@ export class SocketClient<DC extends PDappConfigT, DP extends PDappParamsT>
       // ws.send(`ACK`);
       assert(
         typeof event.data === "string",
-        `${this.name4}.connectToVector.onmessage: data not string: ${event.data}`,
+        `${this.name}.connectToVector.onmessage: data not string: ${event.data}`,
       );
       const result: (string | Sent)[] = await this.receiveVectorMessage(
         event.data,
@@ -524,7 +504,7 @@ export class SocketClient<DC extends PDappConfigT, DP extends PDappParamsT>
       const vectorKeyHash = this.vectorData.get(vectorIpPort)?.keyHash;
       assert(
         vectorKeyHash,
-        `${this.name4}: vectorKeyHash not found: ${vectorKeyHash}`,
+        `${this.name}: vectorKeyHash not found: ${vectorKeyHash}`,
       );
       if (confirmations) {
         if (by.has(vectorKeyHash.concise())) {
@@ -564,7 +544,7 @@ export class SocketClient<DC extends PDappConfigT, DP extends PDappParamsT>
       const utxoEvents = new UtxoEvents(
         [],
         Date.now(),
-        `${this.name4}.processVectorMessage`,
+        `${this.name}.processVectorMessage`,
       );
       msgs.forEach((msg) => {
         const fields = Object.keys(msg);
@@ -604,7 +584,7 @@ export class SocketClient<DC extends PDappConfigT, DP extends PDappParamsT>
             utxoEvents,
             Trace.source(
               `SOCKET`,
-              `${this.name4}.processVectorMessage.notifyUtxoEvents`,
+              `${this.name}.processVectorMessage.notifyUtxoEvents`,
             ),
           ),
         );
@@ -659,7 +639,7 @@ export class SocketClient<DC extends PDappConfigT, DP extends PDappParamsT>
             newBlock,
             Trace.source(
               `SOCKET`,
-              `${this.name4}.processVectorMessage.notifyNewBlock`,
+              `${this.name}.processVectorMessage.notifyNewBlock`,
             ),
           ),
         );
@@ -678,7 +658,7 @@ export class SocketClient<DC extends PDappConfigT, DP extends PDappParamsT>
    * @param {...any} args
    */
   private log = (msg: string, ...args: any) => {
-    console.log(`[${this.name4}] ${msg}`, ...args, `\n`);
+    console.log(`[${this.name}] ${msg}`, ...args, `\n`);
   };
 
   /**
@@ -688,10 +668,10 @@ export class SocketClient<DC extends PDappConfigT, DP extends PDappParamsT>
   private throw = (msg: string) => {
     this.log(`ERROR: ${msg}\n`);
     if (errorTimeoutMs === null) {
-      throw new Error(`${this.name4} ERROR: ${msg}\n`);
+      throw new Error(`${this.name} ERROR: ${msg}\n`);
     } else {
       setTimeout(() => {
-        throw new Error(`${this.name4} ERROR: ${msg}\n`);
+        throw new Error(`${this.name} ERROR: ${msg}\n`);
       }, errorTimeoutMs);
     }
   };

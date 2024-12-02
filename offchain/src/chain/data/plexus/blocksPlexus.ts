@@ -33,8 +33,8 @@ export class BlocksPlexus extends Plexus {
       senseBlock,
     );
   }
-  myelinate(from: string[]): void {
+  public myelinate = (from: string[]): void => {
     const from_ = [...from, `BlocksPlexus`];
     this.blocksGanglion.myelinate(from_);
-  }
+  };
 }

@@ -66,8 +66,8 @@ export class SvmUtxoPlexus<
     );
   }
 
-  myelinate(from: string[]): void {
+  public myelinate = (from: string[]): void => {
     const from_ = [...from, `SvmUtxoPlexus`];
     this.svmUtxoGanglion.myelinate(from_);
-  }
+  };
 }

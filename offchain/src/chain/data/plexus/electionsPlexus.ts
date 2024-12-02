@@ -16,6 +16,10 @@ import { ElectionData } from "../../state/electionData";
 import { BlockHeight, MaybeSvmUtxo, Zygote } from "../zygote";
 import { PDappConfigT, PDappParamsT } from "../../../types/tiamat/tiamat";
 import { BlocksGanglion, BlocksPlexus } from "./blocksPlexus";
+import { Callback } from "../../state/callback";
+import { Effector } from "../effector";
+import { Trace } from "../../../utils/wrappers";
+import { Sent } from "../../state/utxoSource";
 
 type MC = PMatrixConfig;
 type MS = PMatrixState;
@@ -173,6 +177,115 @@ class ElectionGanglion<
   }
 }
 
+/**
+ *
+ * if the current election updates (which should only happen during inital setup), and the next election is more than double margin away, we connect to the eigenvectors.
+ * NOTE: That should however never happen beyond initial setup -> TODO: asserts etc
+ */
+export class CurrentElectionEffector<
+  DC extends PDappConfigT,
+  DP extends PDappParamsT,
+> extends Effector<ElectionData<DC, DP>> {
+  constructor(
+    name: string,
+    updateConnections: (
+      election: ElectionData<DC, DP>,
+    ) => Promise<(string | Sent)[]>, // TODO
+  ) {
+    name = `${name} CurrentElectionEffector`;
+    const connect = async (
+      data: ElectionData<DC, DP>,
+      _trace: Trace,
+    ): Promise<(string | Sent)[]> => {
+      const phase = data.phase.type;
+      if (
+        phase === `within single margin` ||
+        phase === `within double margin`
+      ) {
+        return [`${name}: within double margin or less, not connecting`];
+      } else {
+        return await updateConnections(data);
+      }
+    };
+    const currentElectionEffect = new Callback(
+      `always`,
+      [name, `connect`],
+      connect,
+    );
+    super(currentElectionEffect);
+  }
+}
+
+/**
+ *
+ * if the next election is less than a block away, we do different things, depending on how far the next election is away:
+ * if we are more than two margins away, we simply start a timer for the two-margin effects.
+ * if we are within less than two margins, we start being open for connection requests (server) and stop sending transactions (client).
+ *  * if we are between one and two margins, we start a timer for the one-margin effects.
+ * if we are within a single margin, we start connecting to the next cycle's eigenvectors.
+ */
+export class NextElectionEffector<
+  DC extends PDappConfigT,
+  DP extends PDappParamsT,
+> extends Effector<ElectionData<DC, DP>> {
+  private doubleMarginTimeout?: NodeJS.Timeout;
+  private singleMarginTimeout?: NodeJS.Timeout;
+  constructor(
+    name: string,
+    prepareForConnections: () => Promise<(string | Sent)[]>, // TODO
+    updateConnections: (
+      election: ElectionData<DC, DP>,
+    ) => Promise<(string | Sent)[]>, // TODO
+  ) {
+    name = `${name} NextElectionEffector`;
+    const discernMargins = async (
+      data: ElectionData<DC, DP>,
+      _trace: Trace,
+    ): Promise<(string | Sent)[]> => {
+      clearTimeout(this.doubleMarginTimeout);
+      clearTimeout(this.singleMarginTimeout);
+
+      const phase = data.phase;
+      switch (phase.type) {
+        case `more than one block`:
+          return [
+            `${name}: more than one block from next cycle, doing nothing`,
+          ];
+        case `less than one block`:
+          this.doubleMarginTimeout = setTimeout(
+            prepareForConnections,
+            phase.untilDoubleMarginMs,
+          );
+          this.singleMarginTimeout = setTimeout(
+            () => updateConnections(data),
+            phase.untilSingleMarginMs,
+          );
+          return [`${name}: less than one block from next cycle`];
+        case `within double margin`:
+          this.singleMarginTimeout = setTimeout(
+            () => updateConnections(data),
+            phase.untilSingleMarginMs,
+          );
+          return await prepareForConnections();
+        case `within single margin`:
+          return (
+            await Promise.all([
+              prepareForConnections(),
+              updateConnections(data),
+            ])
+          ).flat();
+      }
+    };
+
+    const currentElectionEffect = new Callback(
+      `always`,
+      [name, `connect`],
+      discernMargins,
+    );
+    super(currentElectionEffect);
+  }
+}
+
 export class ElectionsPlexus<
   DC extends PDappConfigT,
   DP extends PDappParamsT,
@@ -182,6 +295,10 @@ export class ElectionsPlexus<
   public readonly nextElectionGanglion: ElectionGanglion<DC, DP>;
   public readonly currentElectionPrecon: ElectionPrecon<DC, DP>;
   public readonly nextElectionPrecon: ElectionPrecon<DC, DP>;
+  private electionEffectors?: {
+    current: CurrentElectionEffector<DC, DP>;
+    next: NextElectionEffector<DC, DP>;
+  };
 
   constructor(
     contract: TiamatContract<DC, DP>,
@@ -241,10 +358,41 @@ export class ElectionsPlexus<
     );
   }
 
-  myelinate(from: string[]): void {
+  public innervateEffectors = (
+    prepareForConnections: () => Promise<(string | Sent)[]>,
+    updateConnections: (
+      election: ElectionData<DC, DP>,
+    ) => Promise<(string | Sent)[]>,
+  ) => {
+    assert(
+      !this.electionEffectors,
+      `ElectionPreconPlexus: effectors already innervated`,
+    );
+
+    const currentElectionEffector = new CurrentElectionEffector(
+      this.name,
+      updateConnections,
+    ) as Effector<ElectionData<DC, DP>>;
+
+    const nextElectionEffector = new NextElectionEffector(
+      this.name,
+      prepareForConnections,
+      updateConnections,
+    ) as Effector<ElectionData<DC, DP>>;
+
+    this.electionEffectors = {
+      current: currentElectionEffector,
+      next: nextElectionEffector,
+    };
+
+    this.currentElectionGanglion.innervateEffector(currentElectionEffector);
+    this.nextElectionGanglion.innervateEffector(nextElectionEffector);
+  };
+
+  public myelinate = (from: string[]): void => {
     const from_ = [...from, `ElectionPreconPlexus`];
     this.matrixNexusBlocksGanglion.myelinate(from_);
     this.currentElectionGanglion.myelinate(from_);
     this.nextElectionGanglion.myelinate(from_);
-  }
+  };
 }

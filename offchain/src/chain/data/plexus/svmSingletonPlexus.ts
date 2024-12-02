@@ -54,8 +54,8 @@ export class SvmSingletonPlexus<
     );
   }
 
-  myelinate(from: string[]): void {
+  public myelinate = (from: string[]): void => {
     const from_ = [...from, `SvmSingletonPlexus`];
     this.svmUtxoGanglion.myelinate(from_);
-  }
+  };
 }

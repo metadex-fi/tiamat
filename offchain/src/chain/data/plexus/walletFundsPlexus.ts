@@ -39,8 +39,9 @@ export class WalletFundsPlexus<
       senseWalletFunds,
     );
   }
-  myelinate(from: string[]): void {
+
+  public myelinate = (from: string[]): void => {
     const from_ = [...from, `WalletFundsPlexus: ${this.wallet.name}`];
     this.walletFundsGanglion.myelinate(from_);
-  }
+  };
 }

@@ -75,6 +75,7 @@ export class TiamatEmulator<
       matrixNexusTolerance: number,
     ) => ContractT,
     private readonly mkTestingUser: (
+      name: string,
       provider: EmulatorProvider,
       networkId: Core.NetworkId,
       blockfrost: EmulatorProvider,
@@ -203,6 +204,7 @@ export class TiamatEmulator<
   };
 
   private generateUser = async (
+    name: string,
     emulator: Emulator,
     nexusID: Token,
     matrixID: Token,
@@ -227,6 +229,7 @@ export class TiamatEmulator<
     const blockfrost = provider;
     console.log(`creating user`);
     const user = await this.mkTestingUser(
+      name,
       provider,
       this.emulatorParams.networkId,
       blockfrost,
@@ -419,6 +422,7 @@ export class TiamatEmulator<
         for (let i = numVectors + 1n; i < addresses.length; i++) {
           console.log(`generating user #${users.length + 1}`);
           const user = await this.generateUser(
+            `user_${users.length + 1}`,
             emulator,
             seed.nexusID,
             seed.matrixID,

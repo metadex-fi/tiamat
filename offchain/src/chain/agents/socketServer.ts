@@ -97,9 +97,6 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
 
   private readonly electionSemaphore: Simplephore;
   private nextElectionEvent?: ElectionData<DC, DP>;
-  private readonly utxosSemaphore: Simplephore;
-  private utxosEventQueue: UtxoEvents[] = [];
-  private utxos = UtxoSet.empty();
 
   private static singleton?: SocketServer<any, any>;
   private server?: Server;
@@ -152,12 +149,13 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
     );
     const electionSemaphore = new Simplephore(`${this.name} Election`);
     this.electionSemaphore = electionSemaphore;
-    this.utxosSemaphore = new Simplephore(`${this.name} Utxos`);
 
     this.log(`ownKeyHash:`, this.ownPublicKeyHash);
     this.log(`targetOwnIP:`, this.targetOwnIP);
     this.log(`targetOwnPort:`, this.targetOwnPort);
     this.log(`targetStake:`, this.targetStake);
+
+    // contract.electionsPlexus.
 
     // TODO the election semaphore thing
     contract.subscribeToElection(
@@ -322,67 +320,6 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
         ),
       ),
     );
-
-    this.blaze.wallet.getUsedAddresses().then((addresses) => {
-      assert(
-        addresses.length === 1,
-        `${this.name}.blaze.wallet.getUsedAddresses: expected 1 address, got ${addresses.length}`,
-      );
-      const address = Bech32Address.fromBlaze(addresses[0]!);
-      /**
-       *
-       * @param utxoEvents
-       */
-      const processUtxoEvents = (utxoEvents: UtxoEvents) => {
-        utxoEvents.events.forEach((event) => {
-          if (event.type === `create`) {
-            this.utxos.insertNew(event.utxo, Trace.source(`INPUT`, `create`));
-          } else {
-            const { posterior, deleted } = this.utxos.except([
-              event.utxo.input(),
-            ]);
-            this.utxos = posterior;
-            assert(
-              deleted.size === 1,
-              `expected exactly one utxo, got ${deleted.size}`,
-            );
-          }
-        });
-      };
-      contract.subscribeToWalletUtxos(
-        address,
-        new Callback(
-          `always`,
-          [this.name, `constructor`, `subscribeToWalletUtxos`],
-          async (utxoEvents, trace) => {
-            if (this.utxosSemaphore.busy) {
-              this.utxosEventQueue.push(utxoEvents);
-              return await Promise.resolve([`utxos - busy`]);
-            } else {
-              const utxosID = this.utxosSemaphore.latch(
-                `subscribeToWalletUtxos`,
-              );
-              const noUtxos = this.utxos.size === 0;
-              processUtxoEvents(utxoEvents);
-              let nextEvents = this.utxosEventQueue.shift();
-              while (nextEvents) {
-                processUtxoEvents(nextEvents);
-                nextEvents = this.utxosEventQueue.shift();
-              }
-              this.utxosSemaphore.discharge(utxosID);
-              const result: (string | Sent)[] = [`utxos processed`];
-              if (noUtxos && this.utxos.size > 0) {
-                const matrix = this.contract.matrix.maybeSingleton;
-                if (matrix) {
-                  result.push(...(await this.syncEigenValue(matrix, trace)));
-                }
-              }
-              return await Promise.resolve(result);
-            }
-          },
-        ),
-      );
-    });
   }
 
   //////////////////////////////////////////
@@ -417,7 +354,7 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
       contract.networkId,
     );
     const ownPublicKeyHash = await getEd25519KeyHashHex(publicKey);
-    await contract.startWatchingElection();
+    // await contract.startWatchingElection();
     return new SocketServer(
       // ownPrivateKey,
       ownPublicKeyHash,
@@ -461,7 +398,7 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
       contract.networkId,
     );
     const ownPublicKeyHash = await getEd25519KeyHashHex(publicKey);
-    await contract.startWatchingElection();
+    // await contract.startWatchingElection();
     SocketServer.singleton = new SocketServer<DC, DP>(
       // ownPrivateKey,
       ownPublicKeyHash,
@@ -813,84 +750,6 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
   private acceptingConnections = () => {
     return this.eligible;
   };
-
-  // // private get vectorHandler() {
-  // //   const handler = (request: Request, info: Deno.ServeHandlerInfo) => {
-  // //     const reject = (reason: string, ip?: string, port?: number) => {
-  // private get vectorHandler() {
-  //   // In Node.js, we use `IncomingMessage` for request and `Socket` for connection info
-  //   const handler = (req: IncomingMessage, res: ServerResponse) => {
-  //     const reject = (reason: string, ip?: string, port?: number) => {
-  //       const msg = `<> ${ip}:${port}: ${reason}`;
-  //       this.log(msg);
-  //       if (!handleInvalidConnectionAttempts) {
-  //         this.throw(msg);
-  //       }
-  //       return new Response(msg, { status: 400 });
-  //     };
-
-  //     if (req.headers['upgrade'] === 'websocket') {
-  //       const ip = req.socket.remoteAddress;
-  //       if (!ip) {
-  //         const reason = `No ip address specified`;
-  //         return reject(reason, ip);
-  //       }
-  //       if (!req.url) {
-  //         const reason = `No URL specified from ${ip}`;
-  //         return reject(reason, ip);
-  //       }
-  //       const url = new URL(req.url, `http://${req.headers.host}`); // Ensure a base URL
-  //       const socketType = url.searchParams.get('type');
-  //       const remotePort = url.searchParams.get(`port`);
-  //       if (remotePort === null) {
-  //         const reason = `No port specified from ${ip}`;
-  //         return reject(reason, ip);
-  //       }
-  //       const port = parseInt(remotePort);
-
-  //       if (!this.active) {
-  //         const reason = `I am shut down`;
-  //         return reject(reason, ip, port);
-  //       }
-
-  //       if (!this.acceptingConnections()) {
-  //         const reason = `I am not elected`;
-  //         return reject(reason, ip, port);
-  //       }
-
-  //       if (socketType === `client`) {
-  //         const { socket, response } = Deno.upgradeWebSocket(request);
-  //         // await
-  //         this.receiveUserConnection(ip, port, socket);
-  //         return response;
-  //       } else if (socketType === `server`) {
-  //         const keyHash = this.getVectorKeyHash({ ip, port });
-  //         if (keyHash) {
-  //           const { socket, response } = Deno.upgradeWebSocket(request);
-  //           // await
-  //           this.receiveVectorConnection(ip, port, socket);
-  //           return response;
-  //         } else {
-  //           const reason = `You are not elected: ${this.vectorPeerData.show(
-  //             (ev) => ev.keyHash
-  //           )}`;
-  //           return reject(reason, ip, port);
-  //         }
-  //       } else {
-  //         const reason = `Invalid socket type: ${socketType}`;
-  //         return reject(reason, ip, port);
-  //       }
-  //     } else {
-  //       // If the request is a normal HTTP request,
-  //       // we serve the client HTML file.
-  //       // const file = await Deno.open(`./index.html`, { read: true });
-  //       // return new Response(file.readable);
-  //       const reason = `This is not a WebSocket request`;
-  //       return reject(reason);
-  //     }
-  //   };
-  //   return handler;
-  // }
 
   /**
    *

@@ -167,10 +167,7 @@ export class UtxoSource {
    *
    * @param socketClient
    */
-  public static createSocketSingleton<
-    DC extends PDappConfigT,
-    DP extends PDappParamsT,
-  >(socketClient: SocketClient<DC, DP>): UtxoSource {
+  public static createSocketSingleton(socketClient: SocketClient): UtxoSource {
     assert(
       !UtxoSource.socketSingleton,
       `UtxoPubSub: socketSingleton already exists`,

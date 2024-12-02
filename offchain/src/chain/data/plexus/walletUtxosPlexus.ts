@@ -40,8 +40,8 @@ export class WalletUtxosPlexus<
       senseWalletUtxos,
     );
   }
-  myelinate(from: string[]): void {
+  public myelinate = (from: string[]): void => {
     const from_ = [...from, `WalletUtxosPlexus`];
     this.walletUtxosGanglion.myelinate(from_);
-  }
+  };
 }

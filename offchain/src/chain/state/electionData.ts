@@ -12,12 +12,14 @@ import {
   assertWithinMargin,
   logElection,
   logRegistered,
+  blockDurationMs,
 } from "../../utils/constants";
 import { PLifted } from "../../types/general/fundamental/type";
 import { Core } from "@blaze-cardano/sdk";
 import { MatrixUtxo, NexusUtxo } from "./tiamatSvmUtxo";
 import blake from "blakejs";
 import { Zygote } from "../data/zygote";
+import { b } from "../../../../../../blaze-cardano/packages/blaze-tx/dist/value-C_J_5qtu.mjs";
 
 export interface EigenvectorData {
   valency: number;
@@ -160,6 +162,51 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
     //   `${forCycle} ElectionData: withinMargin? ${withinMargin}` // NOTE this is mostly for the asserts below
     // );
 
+    const nextBoundaryMs = forCycle === `current` ? toMs : fromMs;
+    const untilBoundaryMs = Number(nextBoundaryMs) - Date.now();
+    const blocksUntilBoundary = untilBoundaryMs / blockDurationMs;
+
+    let phase:
+      | {
+          type: `within single margin`;
+        }
+      | {
+          type: `within double margin`;
+          untilSingleMarginMs: number;
+        }
+      | {
+          type: `less than one block`;
+          untilDoubleMarginMs: number;
+          untilSingleMarginMs: number;
+        }
+      | {
+          type: `more than one block`;
+        };
+
+    if (blocksUntilBoundary <= 1) {
+      const margin = Number(tiamatParams.margin_duration);
+      if (untilBoundaryMs <= margin) {
+        phase = {
+          type: `within single margin`,
+        };
+      } else if (untilBoundaryMs <= 2 * margin) {
+        phase = {
+          type: `within double margin`,
+          untilSingleMarginMs: untilBoundaryMs - margin,
+        };
+      } else {
+        phase = {
+          type: `less than one block`,
+          untilDoubleMarginMs: untilBoundaryMs - 2 * margin,
+          untilSingleMarginMs: untilBoundaryMs - margin,
+        };
+      }
+    } else {
+      phase = {
+        type: `more than one block`,
+      };
+    }
+
     return new ElectionData(
       name,
       matrixUtxo,
@@ -174,6 +221,7 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
       seed,
       matrixUtxoString,
       suitableForElection,
+      phase,
     );
   }
 
@@ -191,6 +239,22 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
     public readonly seed: string,
     public readonly matrixUtxoString: string,
     public readonly suitableForElection: boolean,
+    public readonly phase:
+      | {
+          type: `within single margin`;
+        }
+      | {
+          type: `within double margin`;
+          untilSingleMarginMs: number;
+        }
+      | {
+          type: `less than one block`;
+          untilDoubleMarginMs: number;
+          untilSingleMarginMs: number;
+        }
+      | {
+          type: `more than one block`;
+        },
   ) {}
 
   public equals = (other: ElectionData<DC, DP>): boolean => {
