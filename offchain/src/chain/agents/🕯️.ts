@@ -1,4 +1,3 @@
-export * from "./electionPraetor";
 export * from "./eva";
 export * from "./semaphore";
 export * from "./socketClient";

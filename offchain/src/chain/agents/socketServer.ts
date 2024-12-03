@@ -20,13 +20,12 @@ import { RegisterVectorAction } from "../actions/matrixAction/registerVectorActi
 import { UpdateVectorAction } from "../actions/matrixAction/updateVectorAction";
 import { LockStakeAction } from "../actions/vestingAction/lockStakeAction";
 import { TiamatContract } from "../state/tiamatContract";
-import { Sent, UtxoEvents, UtxoSource } from "../state/utxoSource";
+import { Sent, UtxoSource } from "../state/utxoSource";
 import { MatrixUtxo, TiamatSvmUtxo } from "../state/tiamatSvmUtxo";
 import { SocketKupmios } from "./socketKupmios";
 import { SocketPraetor, UserSockets, VectorSockets } from "./socketPraetor";
 import { SubscriptionPraetor } from "./subscriptionPraetor";
 import { Callback } from "../state/callback";
-import { Simplephore } from "./semaphore";
 import {
   Bech32Address,
   P,
@@ -95,16 +94,12 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
   private eligible = false;
   // private ipInSync = false; // TODO manage and make use of this (not a priority rn)
 
-  private readonly electionSemaphore: Simplephore;
-  private nextElectionEvent?: ElectionData<DC, DP>;
-
   private static singleton?: SocketServer<any, any>;
   private server?: Server;
   private retryConnectTimeout?: NodeJS.Timeout;
   private counterConnectTimeout?: NodeJS.Timeout;
   private connectionCheckTimeout?: NodeJS.Timeout;
   private active = true;
-  private nextElection?: ElectionData<DC, DP>;
 
   /**
    *
@@ -147,160 +142,101 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
       `${this.name} UserSockets`,
       new UserSockets(),
     );
-    const electionSemaphore = new Simplephore(`${this.name} Election`);
-    this.electionSemaphore = electionSemaphore;
 
     this.log(`ownKeyHash:`, this.ownPublicKeyHash);
     this.log(`targetOwnIP:`, this.targetOwnIP);
     this.log(`targetOwnPort:`, this.targetOwnPort);
     this.log(`targetStake:`, this.targetStake);
 
-    // contract.electionsPlexus.
-
-    // TODO the election semaphore thing
-    contract.subscribeToElection(
-      new Callback(
-        `always`,
-        [this.name, `constructor`, `subscribeToElection`],
-        async (election, trace) => {
-          if (this.electionSemaphore.busy) {
-            this.nextElectionEvent = election;
-            this.log(`one election queued`);
-            return await Promise.resolve([`election - busy`]);
-          }
-          const electionID = electionSemaphore.latch(`subscribeToElection`);
-          const result: string[] = [];
-
-          while (true) {
-            if (!this.active) break;
-
-            this.tip = election.tiamatParams.suggested_tip;
-            const firstOwnIndex = election.eligibleEVs.findIndex(
-              (ev) => ev.vector.toBlaze() === this.ownPublicKeyHash,
-            );
-            const eligible = firstOwnIndex !== -1;
-            this.log(`firstOwnIndex:`, firstOwnIndex);
-            if (!eligible) {
-              if (this.eligible) {
-                this.log(`stopped being eligible`);
-                this.eligible = false; // for speed before closing connections
-                await this.closeAllConnections();
-              }
-            } else {
-              if (!this.eligible) {
-                this.log(`became eligible`);
-                this.eligible = true;
-              }
-              this.vectorPeerData = election.eligibleEVsValencies;
-              this.vectorPeerData.delete(this.ownIpPort);
-
-              if (election.forCycle === `current`) {
-                const fromMs = Number(election.fromMs);
-                const toMs = Number(election.toMs);
-                const midCycleMs =
-                  fromMs + Number(election.tiamatParams.cycle_duration) * 0.5;
-
-                const sinceStartMs = Date.now() - fromMs;
-                const untilEndMs = toMs - Date.now();
-                const untilMidMs = midCycleMs - Date.now();
-
-                assert(
-                  sinceStartMs >= 0,
-                  `${this.name}: current election starts in ${
-                    -sinceStartMs / slotDurationMs
-                  } slots`,
-                );
-                this.log(
-                  `current election started`,
-                  sinceStartMs / slotDurationMs,
-                  `slots ago`,
-                );
-                assert(
-                  untilEndMs > 0,
-                  `${this.name}: current election in the past by ${
-                    -untilEndMs / slotDurationMs
-                  } slots`,
-                );
-                this.log(
-                  `current election ends in`,
-                  untilEndMs / slotDurationMs,
-                  `slots`,
-                );
-
-                if (this.matrixUnchanged(election)) {
-                  if (this.sameElectionTimes(election)) {
-                    if (this.nexusUnchanged(election)) {
-                      this.nextElection?.assertAlignment(election);
-                    }
-                    if (untilMidMs > 0) {
-                      this.log(
-                        `checking connections in`,
-                        untilMidMs / slotDurationMs,
-                        `slots`,
-                      );
-                      this.connectionCheckTimeout = setTimeout(
-                        () => this.checkCurrentConnections(),
-                        untilMidMs,
-                      );
-                    } else {
-                      this.log(
-                        `missed connection check by ${
-                          -untilMidMs / slotDurationMs
-                        } slots`,
-                      );
-                    }
-                  }
-                }
-              } else {
-                this.nextElection = election;
-                const untilMs = Number(election.fromMs) - Date.now();
-                assert(
-                  untilMs >= 0,
-                  `${this.name}: next election started ${
-                    -untilMs / slotDurationMs
-                  } slots ago`,
-                );
-                this.log(
-                  `next election starts in`,
-                  untilMs / slotDurationMs,
-                  `slots`,
-                );
-              }
-
-              const marginDurationMs = Number(
-                election.tiamatParams.margin_duration,
-              );
-
-              const counterConnectTimeoutMs = marginDurationMs / 2;
-              const retryTimeoutMs = marginDurationMs / 4;
-              const retryDeadlineMs = Date.now() + marginDurationMs / 2;
-
-              await this.updateVectorConnections(
-                election.eligibleEVs,
-                election.eligibleEVsValencies,
-                firstOwnIndex,
-                counterConnectTimeoutMs,
-                false,
-                retryTimeoutMs,
-                retryDeadlineMs,
-                trace,
-              );
-            }
-            result.push(`election processed for ${election.forCycle} cycle`);
-            if (this.nextElectionEvent) {
-              election = this.nextElectionEvent;
-              this.nextElectionEvent = undefined;
-              this.log(`processing queued election`);
-            } else {
-              break;
-            }
-          }
-
-          electionSemaphore.discharge(electionID);
-          return await Promise.resolve(result);
-        },
-      ),
+    contract.electionsPlexus.innervateMarginEffectors(
+      this.maybeAcceptConnections,
+      this.updateElectionConnections,
     );
+
+    // contract.electionsPlexus.currentElectionGanglion.innervateEffector(
+    //   new Effector(
+    //     new Callback(
+    //       `always`,
+    //       [this.name, `currentElectionGanglion`, `innervateEffector`],
+    //       async (election, trace) => {
+    //         this.tip = election.tiamatParams.suggested_tip;
+    //         this.vectorPeerData = election.eligibleEVsValencies;
+    //         this.vectorPeerData.delete(this.ownIpPort);
+
+    //       },
+    //     )
+    //   )
+    // )
+
+    // NOTE/TODO: keeping the rest of this around in case we want to parse it into the new version later
+    // contract.subscribeToElection(
+    //   new Callback(
+    //     `always`,
+    //     [this.name, `constructor`, `subscribeToElection`],
+    //     async (election: ElectionData<DC, DP>, trace) => {
+
+    //       if (election.forCycle === `current`) {
+    //         const fromMs = Number(election.fromMs);
+    //         const toMs = Number(election.toMs);
+    //         const midCycleMs =
+    //           fromMs + Number(election.tiamatParams.cycle_duration) * 0.5;
+
+    //         const sinceStartMs = Date.now() - fromMs;
+    //         const untilEndMs = toMs - Date.now();
+    //         const untilMidMs = midCycleMs - Date.now();
+
+    //         assert(
+    //           sinceStartMs >= 0,
+    //           `${this.name}: current election starts in ${
+    //             -sinceStartMs / slotDurationMs
+    //           } slots`,
+    //         );
+    //         this.log(
+    //           `current election started`,
+    //           sinceStartMs / slotDurationMs,
+    //           `slots ago`,
+    //         );
+    //         assert(
+    //           untilEndMs > 0,
+    //           `${this.name}: current election in the past by ${
+    //             -untilEndMs / slotDurationMs
+    //           } slots`,
+    //         );
+    //         this.log(
+    //           `current election ends in`,
+    //           untilEndMs / slotDurationMs,
+    //           `slots`,
+    //         );
+
+    //         if (this.matrixUnchanged(election)) {
+    //           if (this.sameElectionTimes(election)) {
+    //             if (this.nexusUnchanged(election)) {
+    //               this.nextElection?.assertAlignment(election);
+    //             }
+    //             if (untilMidMs > 0) {
+    //               this.log(
+    //                 `checking connections in`,
+    //                 untilMidMs / slotDurationMs,
+    //                 `slots`,
+    //               );
+    //               this.connectionCheckTimeout = setTimeout(
+    //                 () => this.checkCurrentConnections(),
+    //                 untilMidMs,
+    //               );
+    //             } else {
+    //               this.log(
+    //                 `missed connection check by ${
+    //                   -untilMidMs / slotDurationMs
+    //                 } slots`,
+    //               );
+    //             }
+    //           }
+    //         }
+    //       }
+
+    //     },
+    //   ),
+    // );
 
     contract.matrixPlexus.svmUtxoGanglion.innervateEffector(
       new Effector(
@@ -862,6 +798,83 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
     return handler;
   }
 
+  private maybeAcceptConnections = async (
+    election: ElectionData<DC, DP>,
+  ): Promise<(string | Sent)[]> => {
+    const firstOwnIndex = election.eligibleEVs.findIndex(
+      (ev) => ev.vector.toBlaze() === this.ownPublicKeyHash,
+    );
+    const eligible = firstOwnIndex !== -1;
+    this.log(`maybeOpenForConnections: firstOwnIndex =`, firstOwnIndex);
+    let msg: string;
+    if (!eligible) {
+      if (this.eligible) {
+        msg = `stopped being eligible`;
+        this.eligible = false; // for speed before closing connections
+        await this.closeAllConnections();
+      } else {
+        msg = `still not eligible`;
+      }
+    } else {
+      if (!this.eligible) {
+        msg = `became eligible`;
+        this.eligible = true;
+      } else {
+        msg = `remaining eligible`;
+      }
+    }
+    this.log(msg);
+    return [msg];
+  };
+
+  private updateElectionConnections = async (
+    election: ElectionData<DC, DP>,
+    trace: Trace,
+  ): Promise<(string | Sent)[]> => {
+    this.tip = election.tiamatParams.suggested_tip;
+    const firstOwnIndex = election.eligibleEVs.findIndex(
+      (ev) => ev.vector.toBlaze() === this.ownPublicKeyHash,
+    );
+    const eligible = firstOwnIndex !== -1;
+    this.log(`updateElectionConnections: firstOwnIndex =`, firstOwnIndex);
+    this.vectorPeerData = election.eligibleEVsValencies.clone;
+    const deleted = this.vectorPeerData.delete(this.ownIpPort);
+    if (!eligible) {
+      assert(
+        !deleted,
+        `${this.name}.updateElectionConnections: deleted self from eligibleEVsValencies`,
+      );
+      return [`${this.name}.updateElectionConnections: not eligible`];
+    } else {
+      assert(
+        deleted,
+        `${this.name}.updateElectionConnections: did not delete self from eligibleEVsValencies`,
+      );
+    }
+
+    const marginDurationMs = Number(election.tiamatParams.margin_duration);
+
+    const counterConnectTimeoutMs = marginDurationMs * 2;
+    const retryTimeoutMs = marginDurationMs;
+    const retryDeadlineMs = Date.now() + marginDurationMs * 2;
+    const electionCheckTimeoutMs = marginDurationMs * 3;
+
+    setTimeout(() => this.checkCurrentConnections(), electionCheckTimeoutMs);
+
+    await this.updateVectorConnections(
+      election.eligibleEVs,
+      election.eligibleEVsValencies,
+      firstOwnIndex,
+      counterConnectTimeoutMs,
+      false,
+      retryTimeoutMs,
+      retryDeadlineMs,
+      trace,
+    );
+
+    return [`${this.name}.updateElectionConnections: connections updated`];
+  };
+
   /**
    *
    * @param eligibleEVs
@@ -884,7 +897,6 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
     trace: Trace,
   ): Promise<void> => {
     if (!this.active) return;
-    if (this.nextElectionEvent) return;
 
     const [peers, id] = await this.vectorPeerSockets.latch(
       `updateVectorConnections`,
@@ -1008,108 +1020,107 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
     }
   };
 
-  /**
-   *
-   * @param currentElection
-   */
-  private matrixUnchanged = (
-    currentElection: ElectionData<DC, DP>,
-  ): boolean => {
-    if (
-      this.nextElection?.matrixUtxoString === currentElection.matrixUtxoString
-    ) {
-      this.log(`same matrix utxos:\n`, currentElection.matrixUtxoString);
-      return true;
-    } else {
-      this.log(
-        `new matrix utxo:\n`,
-        this.nextElection?.matrixUtxoString,
-        `\n`,
-        currentElection.matrixUtxoString,
-      );
-      return false;
-    }
-  };
+  // /**
+  //  *
+  //  * @param currentElection
+  //  */
+  // private matrixUnchanged = (
+  //   currentElection: ElectionData<DC, DP>,
+  // ): boolean => {
+  //   if (
+  //     this.nextElection?.matrixUtxoString === currentElection.matrixUtxoString
+  //   ) {
+  //     this.log(`same matrix utxos:\n`, currentElection.matrixUtxoString);
+  //     return true;
+  //   } else {
+  //     this.log(
+  //       `new matrix utxo:\n`,
+  //       this.nextElection?.matrixUtxoString,
+  //       `\n`,
+  //       currentElection.matrixUtxoString,
+  //     );
+  //     return false;
+  //   }
+  // };
 
-  /**
-   *
-   * @param currentElection
-   */
-  private nexusUnchanged = (currentElection: ElectionData<DC, DP>): boolean => {
-    if (this.nextElection?.seed === currentElection.seed) {
-      this.log(`same nexus seeds:\n`, currentElection.seed);
-      return true;
-    } else {
-      this.log(
-        `new nexus seed:\n`,
-        this.nextElection?.seed,
-        `\n`,
-        currentElection.seed,
-      );
-      return false;
-    }
-  };
+  // /**
+  //  *
+  //  * @param currentElection
+  //  */
+  // private nexusUnchanged = (currentElection: ElectionData<DC, DP>): boolean => {
+  //   if (this.nextElection?.seed === currentElection.seed) {
+  //     this.log(`same nexus seeds:\n`, currentElection.seed);
+  //     return true;
+  //   } else {
+  //     this.log(
+  //       `new nexus seed:\n`,
+  //       this.nextElection?.seed,
+  //       `\n`,
+  //       currentElection.seed,
+  //     );
+  //     return false;
+  //   }
+  // };
 
-  /**
-   *
-   * @param currentElection
-   */
-  private sameElectionTimes = (
-    currentElection: ElectionData<DC, DP>,
-  ): boolean => {
-    const nextElection = this.nextElection;
-    assert(nextElection, `${this.name}: next election not found`);
-    // TODO fix those cases
-    if (
-      nextElection.fromMs === currentElection.fromMs &&
-      nextElection.toMs === currentElection.toMs
-    ) {
-      return true;
-    } else {
-      this.log(
-        `election-times not aligned:\n`,
-        `next:   `,
-        Number(nextElection.fromMs) / slotDurationMs,
-        Number(nextElection.toMs) / slotDurationMs,
-        `\n`,
-        `current:`,
-        Number(currentElection.fromMs) / slotDurationMs,
-        Number(currentElection.toMs) / slotDurationMs,
-      );
-      const precedesBy =
-        Number(currentElection.fromMs - nextElection.fromMs) / slotDurationMs;
-      const precedesBy_ =
-        Number(currentElection.toMs - nextElection.toMs) / slotDurationMs;
-      assert(
-        precedesBy === precedesBy_,
-        `${this.name}: cycle duration changed: ${precedesBy} vs. ${precedesBy_}`,
-      );
-      if (currentElection.toMs === nextElection.fromMs) {
-        this.log(
-          `next election starts immediately after current election, assuming we're just fast this time...`,
-        ); // TODO investigate if that's an issue (later)
-      } else if (precedesBy >= 0) {
-        this.log(
-          `next election precedes current election by ${precedesBy} slots`,
-        ); // TODO fix this (later)
-        // this.throw(
-        //   `next election precedes current election by ${precedesBy} slots`,
-        // );
-      } else {
-        this.throw(
-          `next election after current election by ${-precedesBy} slots`,
-        );
-      }
-      return false;
-    }
-  };
+  // /**
+  //  *
+  //  * @param currentElection
+  //  */
+  // private sameElectionTimes = (
+  //   currentElection: ElectionData<DC, DP>,
+  // ): boolean => {
+  //   const nextElection = this.nextElection;
+  //   assert(nextElection, `${this.name}: next election not found`);
+  //   // TODO fix those cases
+  //   if (
+  //     nextElection.fromMs === currentElection.fromMs &&
+  //     nextElection.toMs === currentElection.toMs
+  //   ) {
+  //     return true;
+  //   } else {
+  //     this.log(
+  //       `election-times not aligned:\n`,
+  //       `next:   `,
+  //       Number(nextElection.fromMs) / slotDurationMs,
+  //       Number(nextElection.toMs) / slotDurationMs,
+  //       `\n`,
+  //       `current:`,
+  //       Number(currentElection.fromMs) / slotDurationMs,
+  //       Number(currentElection.toMs) / slotDurationMs,
+  //     );
+  //     const precedesBy =
+  //       Number(currentElection.fromMs - nextElection.fromMs) / slotDurationMs;
+  //     const precedesBy_ =
+  //       Number(currentElection.toMs - nextElection.toMs) / slotDurationMs;
+  //     assert(
+  //       precedesBy === precedesBy_,
+  //       `${this.name}: cycle duration changed: ${precedesBy} vs. ${precedesBy_}`,
+  //     );
+  //     if (currentElection.toMs === nextElection.fromMs) {
+  //       this.log(
+  //         `next election starts immediately after current election, assuming we're just fast this time...`,
+  //       ); // TODO investigate if that's an issue (later)
+  //     } else if (precedesBy >= 0) {
+  //       this.log(
+  //         `next election precedes current election by ${precedesBy} slots`,
+  //       ); // TODO fix this (later)
+  //       // this.throw(
+  //       //   `next election precedes current election by ${precedesBy} slots`,
+  //       // );
+  //     } else {
+  //       this.throw(
+  //         `next election after current election by ${-precedesBy} slots`,
+  //       );
+  //     }
+  //     return false;
+  //   }
+  // };
 
   /**
    *
    */
   private checkCurrentConnections = async () => {
     if (!this.active) return;
-    if (this.nextElectionEvent) return;
     this.log(`checking current connections`);
     const [peers, id] = await this.vectorPeerSockets.latch(
       `checkCurrentConnections`,
@@ -1936,10 +1947,10 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
       return [`syncEigenValue: nexus not found`];
     }
 
-    if (this.utxos.size === 0) {
+    const utxos = await UtxoSet.ofWallet(this.blaze.wallet);
+    if (utxos.size === 0) {
       return [`no utxos`];
     }
-    const utxos = this.utxos.clone();
 
     const ownEigenValue = eigenValues.find(
       (ev) => ev.vector.concise() === this.ownPublicKeyHash,
@@ -1971,9 +1982,8 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
           this.targetOwnPort,
           this.targetStake,
         );
-        const ownUtxos = await UtxoSet.ofWallet(this.blaze.wallet);
         tx = registerVectorAction.unhingedTx(
-          new Tx(this.blaze, ownUtxos),
+          new Tx(this.blaze, utxos),
           ackCallback,
           nexusUtxo,
         );
@@ -1990,9 +2000,8 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
         eigenwert,
         currentStake,
       );
-      const ownUtxos = await UtxoSet.ofWallet(this.blaze.wallet);
       tx = deregisterVectorAction.unhingedTx(
-        new Tx(this.blaze, ownUtxos),
+        new Tx(this.blaze, utxos),
         ackCallback,
         nexusUtxo,
       );
@@ -2007,9 +2016,8 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
           vector,
           deposited,
         );
-        const ownUtxos = await UtxoSet.ofWallet(this.blaze.wallet);
         tx = changeStakeAction.unhingedTx(
-          new Tx(this.blaze, ownUtxos),
+          new Tx(this.blaze, utxos),
           ackCallback,
           nexusUtxo,
         );
@@ -2041,8 +2049,7 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
           );
           tx_ = await firstTx.chain(`same`);
         } else {
-          const ownUtxos = await UtxoSet.ofWallet(this.blaze.wallet);
-          tx_ = new Tx(this.blaze, ownUtxos);
+          tx_ = new Tx(this.blaze, utxos);
         }
         const updateVectorAction = new UpdateVectorAction(
           matrix_,

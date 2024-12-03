@@ -140,6 +140,7 @@ export class SocketClient implements ChainInterface {
     DP extends PDappParamsT,
   >(
     election: ElectionData<DC, DP>,
+    _trace: Trace,
   ): Promise<(string | Sent)[]> => {
     this.numSupportVectors = election.tiamatParams.num_support_vectors;
     this.vectorData = election.eligibleEVsValencies;

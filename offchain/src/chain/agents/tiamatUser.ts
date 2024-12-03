@@ -20,6 +20,7 @@ import { Semaphore } from "./semaphore";
 import { Effector } from "../data/effector";
 import { Callback } from "../state/callback";
 import { BlockHeight } from "../data/zygote";
+import { ElectionData } from "../state/electionData";
 
 type MkContractT<
   DC extends PDappConfigT,
@@ -392,11 +393,11 @@ export abstract class TiamatUser<
               this.actionSemaphore.discharge(this.marginLockId);
               this.marginLockId = undefined;
               return Promise.resolve([
-                `${this.name}.unblockAfterMargins: margin lock discharged`,
+                `${this.name}.unlockAfterMargins: margin lock discharged`,
               ]);
             } else {
               return Promise.resolve([
-                `${this.name}.unblockAfterMargins: no margin lock to discharge`,
+                `${this.name}.unlockAfterMargins: no margin lock to discharge`,
               ]);
             }
           },
@@ -404,7 +405,7 @@ export abstract class TiamatUser<
       ),
     );
 
-    this.contract.electionsPlexus.innervateEffectors(
+    this.contract.electionsPlexus.innervateMarginEffectors(
       this.lockDuringMargins,
       socketClient.updateConnections,
     );
@@ -418,7 +419,7 @@ export abstract class TiamatUser<
     this.contract.myelinate(from_);
   };
 
-  protected lockDuringMargins = async () => {
+  protected lockDuringMargins = async (_election: ElectionData<DC, DP>) => {
     assert(
       !this.marginLockId,
       `${this.name}.lockDuringMargins: margin lock already latched`,

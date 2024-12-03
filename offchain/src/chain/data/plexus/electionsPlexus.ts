@@ -190,12 +190,13 @@ export class CurrentElectionEffector<
     name: string,
     updateConnections: (
       election: ElectionData<DC, DP>,
+      trace: Trace,
     ) => Promise<(string | Sent)[]>, // TODO
   ) {
     name = `${name} CurrentElectionEffector`;
     const connect = async (
       data: ElectionData<DC, DP>,
-      _trace: Trace,
+      trace: Trace,
     ): Promise<(string | Sent)[]> => {
       const phase = data.phase.type;
       if (
@@ -204,7 +205,7 @@ export class CurrentElectionEffector<
       ) {
         return [`${name}: within double margin or less, not connecting`];
       } else {
-        return await updateConnections(data);
+        return await updateConnections(data, trace);
       }
     };
     const currentElectionEffect = new Callback(
@@ -232,15 +233,18 @@ export class NextElectionEffector<
   private singleMarginTimeout?: NodeJS.Timeout;
   constructor(
     name: string,
-    prepareForConnections: () => Promise<(string | Sent)[]>, // TODO
+    prepareForConnections: (
+      election: ElectionData<DC, DP>,
+    ) => Promise<(string | Sent)[]>, // TODO
     updateConnections: (
       election: ElectionData<DC, DP>,
+      trace: Trace,
     ) => Promise<(string | Sent)[]>, // TODO
   ) {
     name = `${name} NextElectionEffector`;
     const discernMargins = async (
       data: ElectionData<DC, DP>,
-      _trace: Trace,
+      trace: Trace,
     ): Promise<(string | Sent)[]> => {
       clearTimeout(this.doubleMarginTimeout);
       clearTimeout(this.singleMarginTimeout);
@@ -253,25 +257,25 @@ export class NextElectionEffector<
           ];
         case `less than one block`:
           this.doubleMarginTimeout = setTimeout(
-            prepareForConnections,
+            () => prepareForConnections(data),
             phase.untilDoubleMarginMs,
           );
           this.singleMarginTimeout = setTimeout(
-            () => updateConnections(data),
+            () => updateConnections(data, trace),
             phase.untilSingleMarginMs,
           );
           return [`${name}: less than one block from next cycle`];
         case `within double margin`:
           this.singleMarginTimeout = setTimeout(
-            () => updateConnections(data),
+            () => updateConnections(data, trace),
             phase.untilSingleMarginMs,
           );
-          return await prepareForConnections();
+          return await prepareForConnections(data);
         case `within single margin`:
           return (
             await Promise.all([
-              prepareForConnections(),
-              updateConnections(data),
+              prepareForConnections(data),
+              updateConnections(data, trace),
             ])
           ).flat();
       }
@@ -358,10 +362,13 @@ export class ElectionsPlexus<
     );
   }
 
-  public innervateEffectors = (
-    prepareForConnections: () => Promise<(string | Sent)[]>,
+  public innervateMarginEffectors = (
+    prepareForConnections: (
+      election: ElectionData<DC, DP>,
+    ) => Promise<(string | Sent)[]>,
     updateConnections: (
       election: ElectionData<DC, DP>,
+      trace: Trace,
     ) => Promise<(string | Sent)[]>,
   ) => {
     assert(
