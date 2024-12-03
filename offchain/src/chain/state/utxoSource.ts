@@ -20,7 +20,6 @@ import { AssocMap } from "../../types/general/fundamental/container/map";
 import { SocketClient } from "../agents/socketClient";
 import { CliqueElectionTx, CliqueTippedTx, UtxoEventMsg } from "./messages";
 import { ErrorTimeout } from "../../utils/errorTimeout";
-import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
 import { SocketServer } from "../agents/socketServer";
 import { Wallet } from "./wallet";
 import { TiamatSvm } from "./tiamatSvm";

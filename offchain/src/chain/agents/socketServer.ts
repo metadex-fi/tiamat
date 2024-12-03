@@ -11,7 +11,6 @@ import {
   maxUserMsgDelay,
   maxVectorMsgDelay,
   recordedTxCacheSize,
-  slotDurationMs,
   wsAttemptTimeoutMs,
 } from "../../utils/constants";
 import { ChangeStakeAction } from "../actions/matrixAction/changeStakeAction";

@@ -72,10 +72,7 @@ export interface BPAddress {
 /**
  *
  */
-export abstract class TiamatContract<
-  DC extends PDappConfigT,
-  DP extends PDappParamsT,
-> {
+export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
   protected static instances = new Map<string, number>();
   public readonly name: string;
   public readonly matrix: MatrixSvm;

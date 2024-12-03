@@ -1,11 +1,7 @@
 import assert from "assert";
 import { KeyHash } from "../../../types/general/derived/hash/keyHash";
 import { PositiveValue } from "../../../types/general/derived/value/positiveValue";
-import {
-  EigenValue,
-  PDappConfigT,
-  PDappParamsT,
-} from "../../../types/tiamat/tiamat";
+import { EigenValue } from "../../../types/tiamat/tiamat";
 import {
   DeregisterVector,
   MatrixAction,
@@ -19,11 +15,7 @@ import { UnhingedAction } from "../action";
 /**
  *
  */
-export class DeregisterVectorAction<
-  DC extends PDappConfigT,
-  DP extends PDappParamsT,
-> implements UnhingedAction<MatrixUtxo>
-{
+export class DeregisterVectorAction implements UnhingedAction<MatrixUtxo> {
   public readonly action: MatrixAction;
   public readonly newState: MatrixState;
   public readonly newValue: PositiveValue;

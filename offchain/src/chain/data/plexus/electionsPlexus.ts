@@ -132,7 +132,7 @@ class MatrixNexusBlocksGanglion<
   }
 }
 
-class ElectionGanglion<
+export class ElectionGanglion<
   DC extends PDappConfigT,
   DP extends PDappParamsT,
 > extends Ganglion<[MatrixNexusBlock<DC, DP>], ElectionData<DC, DP>> {
