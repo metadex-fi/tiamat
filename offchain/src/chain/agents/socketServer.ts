@@ -246,8 +246,9 @@ export class SocketServer<
     //   ),
     // );
 
-    this.cortex.matrixPlexus.svmUtxoGanglion.innervateEffector(
+    this.cortex.matrixPlexus.svmUtxoStem.innervateEffector(
       new Effector(
+        `SocketServerMatrixEffector`,
         new Callback(
           `always`,
           [this.name, `constructor`, `subscribeToMatrix`],

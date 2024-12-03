@@ -4,7 +4,8 @@ import { Zygote } from "./zygote";
 import { Effector } from "./effector";
 import { Sent } from "../state/utxoSource";
 import { Trace } from "../../utils/wrappers";
-import { ErrorTimeout, t } from "../../🕯️";
+import { ErrorTimeout } from "../../utils/errorTimeout";
+import { Semaphore } from "../agents/semaphore";
 
 /**
  * A node in the data processing pipeline.
@@ -17,25 +18,22 @@ import { ErrorTimeout, t } from "../../🕯️";
  * new upstream updates.
  */
 export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
-  private current: OutZT | `virginal` = `virginal`;
-  private afferentsCache: Map<
-    Ganglion<Zygote[], InZsT[number]>,
-    InZsT[number] | "virginal"
-  > = new Map();
+  protected current: OutZT | `virginal` = `virginal`;
 
-  private abortController: AbortController | null = null;
-  private efferents: Array<Ganglion<[...any[], OutZT], Zygote>> = [];
-  private effectors: Array<Effector<OutZT>> = [];
-  private myelinated: string | null = null;
-  private stemInnervations = new Set<() => Promise<(string | Sent)[]>>();
-  private myelinationTimeout?: ErrorTimeout;
+  protected abortController: AbortController | null = null;
+  protected efferents: Array<Ganglion<[...any[], OutZT], Zygote>> = [];
+  protected effectors: Array<Effector<OutZT>> = [];
+  protected myelinated: string | null = null;
+  protected stemInnervations = new Set<() => Promise<(string | Sent)[]>>();
+  protected myelinationTimeout?: ErrorTimeout;
+  protected processSemaphore: Semaphore;
 
   constructor(
-    private readonly name: string,
-    private readonly afferents: {
+    protected readonly name: string,
+    protected readonly afferents: {
       [K in keyof InZsT]: Ganglion<any[], InZsT[K]>;
     },
-    private readonly procedure: (
+    protected readonly procedure: (
       afferentStates: Map<
         Ganglion<any[], InZsT[number]>,
         InZsT[number] | "virginal"
@@ -45,14 +43,10 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
     ) => Promise<OutZT | "virginal">,
   ) {
     assert(
-      this.name.endsWith(`Ganglion`),
-      `Ganglion name must end with Ganglion: ${this.name}`,
+      this.name.endsWith(`Ganglion`) || this.name.endsWith(`Stem`),
+      `Ganglion name must end with Ganglion or Stem: ${this.name}`,
     );
-    // this.current = initialState;
-
-    this.afferents.forEach((afferent) => {
-      this.afferentsCache.set(afferent, afferent.scion);
-    });
+    this.processSemaphore = new Semaphore(name);
 
     this.afferents.forEach((afferent) => {
       // TODO ugly
@@ -80,19 +74,9 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
    * @param afferent
    * @param zygote
    */
-  public induce = (
-    afferent: Ganglion<any[], InZsT[number]>,
-    zygote: InZsT[number],
-    trace: Trace,
-  ) => {
-    this.log(`Inducing from ${afferent.name} with zygote:`, zygote);
+  public induce = (trace: Trace) => {
     assert(this.myelinated, `${this.name}.induce: Ganglion not myelinated`);
-    const current = this.afferentsCache.get(afferent);
-    if (current && current !== `virginal` && current.equals(zygote)) {
-      return;
-    }
-    this.afferentsCache.set(afferent, zygote);
-    this.abortController?.abort();
+    // this.abortController?.abort(); // TODO FIXME
     this.abortController = new AbortController();
     this.process(this.abortController.signal, trace);
   };
@@ -153,30 +137,29 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
    * Process upstream data updates.
    * @param signal
    */
-  private process = async (signal: AbortSignal, trace: Trace) => {
+  protected process = async (signal: AbortSignal, trace: Trace) => {
+    const processID = await this.processSemaphore.latch(`process`);
     try {
       const newState = await this.procedure(
-        new Map(this.afferentsCache),
+        new Map(this.afferents.map((afferent) => [afferent, afferent.scion])),
         this.current,
         signal,
       );
+      const trace_ = trace.compose();
       if (newState === `virginal`) {
-        this.log(`Procedure returned virginal state.`);
-        return;
+        this.log(`Procedure returned virginal state:`, trace_);
+      } else if (signal.aborted) {
+        this.log(`Procedure aborted after execution:`, trace_);
+      } else {
+        this.log(`Procedure returned:`, trace_);
+        if (this.current !== `virginal` && this.current.equals(newState)) {
+          this.log(`No change in state`);
+        } else {
+          this.log(`State changed:\n`, this.current, `\n\t⬇\n`, newState);
+          this.current = newState;
+          this.induceEfferents(newState, trace);
+        }
       }
-      if (signal.aborted) {
-        this.log(`Procedure aborted after execution.`);
-        return;
-      }
-      this.log(`Procedure returned`, newState);
-      if (this.current !== `virginal` && this.current.equals(newState)) {
-        this.log(`No change in state.`);
-        return;
-      }
-      this.log(`State changed.`);
-      this.current = newState;
-      this.log(`Inducing efferents.`);
-      this.induceEfferents(newState, trace);
     } catch (e) {
       if ((e as Error).name === `AbortError`) {
         this.log(`Procedure aborted: ${e}`);
@@ -184,25 +167,27 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
         this.throw(`Error during procedure: ${e}`);
       }
     }
+    this.processSemaphore.discharge(processID);
   };
 
   /**
    * Propagate data updates downstream.
    * @param data
    */
-  private induceEfferents = async (data: OutZT, trace: Trace) => {
+  protected induceEfferents = async (data: OutZT, trace: Trace) => {
+    this.log(
+      `Inducing efferents:\n`,
+      this.efferents.map((e) => e.name),
+      `\nand effectors:\n`,
+      this.effectors.map((e) => e.name),
+    );
     const trace_ = trace.via(this.name);
     const inductionPromises = [
       ...this.efferents.map((efferent) =>
         // TODO ugly
-        efferent.induce(
-          this as unknown as Ganglion<[...Zygote[], Zygote], Zygote>,
-          data,
-          trace_,
-        ),
+        efferent.induce(trace_),
       ),
       ...this.effectors.map((effector) =>
-        // TODO ugly
         effector.induce(data, this.name, trace_),
       ),
     ];
@@ -213,7 +198,7 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
    * Connect to downstream Ganglion.
    * @param efferent
    */
-  private procure = (efferent: Ganglion<[...Zygote[], OutZT], Zygote>) => {
+  protected procure = (efferent: Ganglion<[...Zygote[], OutZT], Zygote>) => {
     assert(
       !this.myelinated,
       `${this.name}.procure: Ganglion already myelinated`,
@@ -230,7 +215,7 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
    * @param msg
    * @param {...any} args
    */
-  private log = (msg: string, ...args: any) => {
+  protected log = (msg: string, ...args: any) => {
     console.log(`[${this.name}] ${msg}`, ...args, `\n`);
   };
 
@@ -238,7 +223,7 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
    *
    * @param msg
    */
-  private throw = (msg: string) => {
+  protected throw = (msg: string) => {
     this.log(`ERROR: ${msg}\n`);
     if (errorTimeoutMs === null) {
       throw new Error(`${this.name} ERROR: ${msg}\n`);

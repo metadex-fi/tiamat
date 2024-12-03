@@ -72,7 +72,7 @@ export abstract class Intent<
         return Promise.resolve([`${this.name}: updated display`]);
       },
     );
-    const chainEffector = new Effector<StatusT>(effect);
+    const chainEffector = new Effector<StatusT>(`IntentChainEffector`, effect);
     chainGanglion.innervateEffector(chainEffector);
   }
 

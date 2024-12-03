@@ -38,7 +38,7 @@ export class Bech32Address {
 
   public concise = () => {
     const bech32 = this.bech32.toString();
-    return `${this.name} (${bech32.slice(0, 4)}...${bech32.slice(-4)})`;
+    return `${this.name}Address (${bech32.slice(0, 4)}...${bech32.slice(-4)})`;
   };
 
   /**

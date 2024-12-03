@@ -19,7 +19,6 @@ import { Core } from "@blaze-cardano/sdk";
 import { MatrixUtxo, NexusUtxo } from "./tiamatSvmUtxo";
 import blake from "blakejs";
 import { Zygote } from "../data/zygote";
-import { b } from "../../../../../../blaze-cardano/packages/blaze-tx/dist/value-C_J_5qtu.mjs";
 
 export interface EigenvectorData {
   valency: number;

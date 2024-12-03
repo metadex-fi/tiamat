@@ -535,15 +535,11 @@ export class UtxoSource {
     utxos: UtxoSet,
     trace: Trace,
   ): Promise<(string | Sent)[]> => {
-    this.log(`initial notify`);
+    this.log(`INITIAL NOTIFY`);
     // this.initialUtxos = utxos;
     const promises: Promise<(string | Sent)[]>[] = [];
     this.addressCallbacks.forEach((callbacks, address) => {
-      const events = new UtxoEvents(
-        [],
-        Date.now(),
-        `${this.name}.initialNotifyUtxoEvents`,
-      );
+      const events: UtxoEvent[] = [];
 
       utxos.list.forEach((utxo) => {
         if (utxo.core.output().address().toBech32() === address.bech32) {
@@ -551,14 +547,26 @@ export class UtxoSource {
             utxo: utxo.core,
             type: "create",
           };
-          events.events.push(event);
+          events.push(event);
         }
       });
-      callbacks.forEach((callback) =>
-        promises.push(
-          callback.run(events, `${this.name}.initialNotifyUtxoEvents`, trace),
-        ),
-      );
+      if (events.length) {
+        const concise = address.concise();
+        const events_ = new UtxoEvents(
+          events,
+          Date.now(),
+          `${this.name}.initialNotifyUtxoEvents.${concise}`,
+        );
+        callbacks.forEach((callback) =>
+          promises.push(
+            callback.run(
+              events_,
+              `${this.name}.initialNotifyUtxoEvents.${concise}`,
+              trace,
+            ),
+          ),
+        );
+      }
     });
     return (await Promise.all(promises)).flat();
   };

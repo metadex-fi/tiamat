@@ -28,14 +28,14 @@ export class ServitorPreconPlexus<
   constructor(
     user: TiamatUser<DC, DP, CT>,
     numTxFees: bigint,
-    private readonly servitorFundsPlexus: WalletFundsPlexus<DC, DP>,
-    private readonly ownerFundsPlexus: WalletFundsPlexus<DC, DP>,
+    private readonly servitorFundsPlexus: WalletFundsPlexus,
+    private readonly ownerFundsPlexus: WalletFundsPlexus,
   ) {
     super(`${user.name} ServitorPreconPlexus`);
     const ganglionName = `${user.name} WalletsFundsGanglion`;
     const afferents = [
-      this.servitorFundsPlexus.walletFundsGanglion,
-      this.ownerFundsPlexus.walletFundsGanglion,
+      this.servitorFundsPlexus.walletFundsStem,
+      this.ownerFundsPlexus.walletFundsStem,
     ];
     const procedure = (
       afferentStates: Map<
@@ -46,10 +46,10 @@ export class ServitorPreconPlexus<
       _signal: AbortSignal,
     ): Promise<WalletsFundsStatus | `virginal`> => {
       const servitorFunds = afferentStates.get(
-        this.servitorFundsPlexus.walletFundsGanglion,
+        this.servitorFundsPlexus.walletFundsStem,
       );
       const ownerFunds = afferentStates.get(
-        this.ownerFundsPlexus.walletFundsGanglion,
+        this.ownerFundsPlexus.walletFundsStem,
       );
       assert(
         servitorFunds && ownerFunds,

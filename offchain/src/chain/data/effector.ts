@@ -7,7 +7,10 @@ import { Zygote } from "./zygote";
  * Some side effect of data updates in some Ganglion.
  */
 export class Effector<InZT extends Zygote> {
-  constructor(private readonly effect: Callback<InZT>) {}
+  constructor(
+    public readonly name: string,
+    private readonly effect: Callback<InZT>,
+  ) {}
 
   public induce = async (
     zygote: InZT,

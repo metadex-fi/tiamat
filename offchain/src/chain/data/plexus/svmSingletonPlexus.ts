@@ -3,8 +3,7 @@ import { PData } from "../../../types/general/fundamental/type";
 import { Trace } from "../../../utils/wrappers";
 import { TiamatSvm } from "../../state/tiamatSvm";
 import { TiamatSvmUtxo } from "../../state/tiamatSvmUtxo";
-import { Ganglion } from "../ganglion";
-import { identityProcedure, SvmStem } from "../stem";
+import { SvmStem } from "../stem";
 import { Plexus } from "../plexus";
 import { MaybeSvmUtxo } from "../zygote";
 import { Sent } from "../../state/utxoSource";
@@ -14,23 +13,10 @@ export class SvmSingletonPlexus<
   PState extends PData,
   PAction extends PData,
 > extends Plexus {
-  public readonly svmUtxoGanglion: Ganglion<
-    any,
-    MaybeSvmUtxo<PConfig, PState, PAction>
-  >;
-  //@ts-ignore
-  private readonly svmUtxoStem: SvmStem<PConfig, PState, PAction>;
+  public readonly svmUtxoStem: SvmStem<PConfig, PState, PAction>;
 
   constructor(svm: TiamatSvm<PConfig, PState, PAction>, tolerance = 0) {
     super(`${svm.name} SvmSingletonPlexus`);
-    this.svmUtxoGanglion = new Ganglion<
-      any,
-      MaybeSvmUtxo<PConfig, PState, PAction>
-    >(
-      `${svm.name} SvmSingletonGanglion`,
-      [], // no afferents for stem-ganglia
-      identityProcedure,
-    );
 
     const senseSvmUtxo = (
       svmUtxos: TiamatSvmUtxo<PConfig, PState, PAction>[],
@@ -47,16 +33,11 @@ export class SvmSingletonPlexus<
       return Promise.resolve(new MaybeSvmUtxo(svmUtxo));
     };
 
-    this.svmUtxoStem = new SvmStem(
-      svm,
-      this.svmUtxoGanglion,
-      senseSvmUtxo,
-      tolerance,
-    );
+    this.svmUtxoStem = new SvmStem(svm, senseSvmUtxo, tolerance);
   }
 
   public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
     const from_ = [...from, `SvmSingletonPlexus`];
-    return await this.svmUtxoGanglion.myelinate(from_);
+    return await this.svmUtxoStem.myelinate(from_);
   };
 }

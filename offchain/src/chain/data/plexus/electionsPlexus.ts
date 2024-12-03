@@ -223,7 +223,7 @@ export class CurrentElectionEffector<
       [name, `connect`],
       connect,
     );
-    super(currentElectionEffect);
+    super(`CurrentElectionEffector`, currentElectionEffect);
   }
 }
 
@@ -296,7 +296,7 @@ export class NextElectionEffector<
       [name, `connect`],
       discernMargins,
     );
-    super(currentElectionEffect);
+    super(`NextElectionEffector`, currentElectionEffect);
   }
 }
 
@@ -323,9 +323,9 @@ export class ElectionsPlexus<
     super(`${contract.name} ElectionPreconPlexus`);
     this.matrixNexusBlocksGanglion = new MatrixNexusBlocksGanglion(
       contract.name,
-      matrixPlexus.svmUtxoGanglion,
-      nexusPlexus.svmUtxoGanglion,
-      blocksPlexus.blocksGanglion,
+      matrixPlexus.svmUtxoStem,
+      nexusPlexus.svmUtxoStem,
+      blocksPlexus.blocksStem,
     );
 
     this.currentElectionGanglion = new ElectionGanglion(

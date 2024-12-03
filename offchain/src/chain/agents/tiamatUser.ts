@@ -88,8 +88,8 @@ export abstract class TiamatUser<
   public readonly servitorWallet: Wallet;
 
   public readonly cortex: TiamatCortex<DC, DP, CT>;
-  public readonly servitorFundsPlexus: WalletFundsPlexus<DC, DP>;
-  public readonly ownerFundsPlexus: WalletFundsPlexus<DC, DP>;
+  public readonly servitorFundsPlexus: WalletFundsPlexus;
+  public readonly ownerFundsPlexus: WalletFundsPlexus;
   public readonly servitorPreconPlexus: ServitorPreconPlexus<DC, DP, CT>;
 
   // mainly for blocking during election-margins
@@ -329,12 +329,8 @@ export abstract class TiamatUser<
       this.blockfrost.getUnspentOutputs(this.contract.nexus.address.blaze),
     ]);
     assert(
-      matrixUtxos.length === 1,
-      `${this.name}: expected exactly one matrix utxo, got ${matrixUtxos.length}`,
-    );
-    assert(
-      nexusUtxos.length === 1,
-      `${this.name}: expected exactly one nexus utxo, got ${nexusUtxos.length}`,
+      matrixUtxos.length === 1 && nexusUtxos.length === 1,
+      `${this.name}.initBlockfrostMatrixNexus: expected exactly one matrix- and nexus-utxo, got ${matrixUtxos.length} matix- and ${nexusUtxos.length} nexus-utxos`,
     );
 
     await this.contract.utxoSource.initialNotifyUtxoEvents(
@@ -395,8 +391,9 @@ export abstract class TiamatUser<
 
     this.cortex = new TiamatCortex(name, contract);
 
-    this.cortex.blocksPlexus.blocksGanglion.innervateEffector(
+    this.cortex.blocksPlexus.blocksStem.innervateEffector(
       new Effector(
+        `TiamatUserUnlockAfterMarginsEffector`,
         new Callback(
           `always`,
           [`${this.name}`, `unlockAfterMargins`],
