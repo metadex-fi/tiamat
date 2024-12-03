@@ -35,13 +35,6 @@ import {
 import { UtxoSource, Sent } from "./utxoSource";
 import { Token } from "../../types/general/derived/asset/token";
 import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
-import {
-  ElectionsPlexus,
-  MatrixPlexus,
-  NexusPlexus,
-} from "../data/plexus/electionsPlexus";
-import { SvmSingletonPlexus } from "../data/plexus/svmSingletonPlexus";
-import { BlocksPlexus } from "../data/plexus/blocksPlexus";
 
 export interface MintingPolicy {
   policy: Core.Script;
@@ -84,11 +77,6 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
   };
   protected subscribedToWallets = false;
 
-  public readonly matrixPlexus: MatrixPlexus;
-  public readonly nexusPlexus: NexusPlexus<DC, DP>;
-  public readonly blocksPlexus: BlocksPlexus;
-  public readonly electionsPlexus: ElectionsPlexus<DC, DP>;
-
   /**
    *
    * @param name
@@ -108,7 +96,7 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
     public readonly pdappConfig: DC,
     public readonly pdappParams: DP,
   ) {
-    this.name = `${name} Contract`;
+    this.name = `${name} TiamatContract`;
     const instance = TiamatContract.instances.get(this.name) ?? 0;
     TiamatContract.instances.set(this.name, instance + 1);
     if (instance) this.name = `${this.name}#${instance}`;
@@ -142,7 +130,6 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
       mkPNexusDatum(pdappConfig, pdappParams),
       true,
     );
-    this.nexusPlexus = new SvmSingletonPlexus(this.nexus);
 
     const nexus = new Asset(this.nexus.currency, nexusID);
     this.bpNexus = PAsset.ptype.pblueprint(nexus);
@@ -168,7 +155,6 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
       pmatrixDatum,
       true,
     );
-    this.matrixPlexus = new SvmSingletonPlexus(this.matrix);
 
     const vestingSvmValidator: Core.Script = new V3VestingSvmValidator(
       this.bpNexus,
@@ -192,33 +178,7 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
       pvestingDatum,
       false,
     );
-
-    // if (!utxoSource.isDummy) {
-    //   this.startElectionLoopTimeout = new ErrorTimeout(
-    //     this.name,
-    //     `startWatchingElection.startElectionLoopTimeout`,
-    //     slotDurationMs,
-    //     Trace.source(`INIT`, `Contract`),
-    //   );
-    // }
-
-    this.blocksPlexus = new BlocksPlexus(this.utxoSource);
-
-    this.electionsPlexus = new ElectionsPlexus(
-      this,
-      this.matrixPlexus,
-      this.nexusPlexus,
-      this.blocksPlexus,
-    );
   }
-
-  public myelinate = (from: string[]) => {
-    const from_ = [...from, `TiamatContract: ${this.name}`];
-    this.matrixPlexus.myelinate(from_);
-    this.nexusPlexus.myelinate(from_);
-    this.blocksPlexus.myelinate(from_);
-    this.electionsPlexus.myelinate(from_);
-  };
 
   /**
    *

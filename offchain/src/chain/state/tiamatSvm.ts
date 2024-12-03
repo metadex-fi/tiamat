@@ -84,6 +84,7 @@ export class TiamatSvm<
     if (instance) this.name = `${this.name}#${instance}`;
 
     this.address = Bech32Address.fromScript(
+      `${this.label}Svm`,
       contract.networkId,
       this.svmValidator,
     );

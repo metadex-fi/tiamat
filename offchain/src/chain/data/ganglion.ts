@@ -1,9 +1,10 @@
 import assert from "assert";
-import { errorTimeoutMs } from "../../utils/constants";
+import { blockDurationMs, errorTimeoutMs } from "../../utils/constants";
 import { Zygote } from "./zygote";
 import { Effector } from "./effector";
 import { Sent } from "../state/utxoSource";
 import { Trace } from "../../utils/wrappers";
+import { ErrorTimeout, t } from "../../🕯️";
 
 /**
  * A node in the data processing pipeline.
@@ -26,7 +27,8 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
   private efferents: Array<Ganglion<[...any[], OutZT], Zygote>> = [];
   private effectors: Array<Effector<OutZT>> = [];
   private myelinated: string | null = null;
-  private stemInnervations = new Set<() => void>();
+  private stemInnervations = new Set<() => Promise<(string | Sent)[]>>();
+  private myelinationTimeout?: ErrorTimeout;
 
   constructor(
     private readonly name: string,
@@ -58,6 +60,12 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
         this as unknown as Ganglion<[...Zygote[], Zygote], Zygote>,
       );
     });
+    this.myelinationTimeout = new ErrorTimeout(
+      `Myelination`,
+      this.name,
+      blockDurationMs,
+      Trace.source(`INIT`, this.name),
+    );
   }
 
   //////////////////////////////////////////
@@ -92,17 +100,20 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
   /**
    * End the setup phase and enable data processing.
    */
-  public myelinate = (from: string[]) => {
+  public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
     const from_ = from.join(`\n`);
     this.log(`Myelinating from:\n\n${from_}\n`);
     assert(
       !this.myelinated,
       `${this.name}.myelinate: Ganglion already myelinated from \n\n${this.myelinated}\n\nAttempted from:\n\n${from_}\n`,
     );
+    this.myelinationTimeout?.clear();
+    this.myelinationTimeout = undefined;
     this.myelinated = from_;
-    for (const innervateStem of this.stemInnervations) {
-      innervateStem();
-    }
+    const result = await Promise.all(
+      [...this.stemInnervations.values()].map((innervate) => innervate()),
+    );
+    return result.flat();
   };
 
   public addStemInnervation = (
@@ -167,11 +178,11 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
       this.log(`Inducing efferents.`);
       this.induceEfferents(newState, trace);
     } catch (e) {
-      // if ((e as Error).name === `AbortError`) {
-      //   this.log(`Procedure aborted: ${e}`);
-      // } else {
-      this.throw(`Error during procedure: ${e}`);
-      // }
+      if ((e as Error).name === `AbortError`) {
+        this.log(`Procedure aborted: ${e}`);
+      } else {
+        this.throw(`Error during procedure: ${e}`);
+      }
     }
   };
 

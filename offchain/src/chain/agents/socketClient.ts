@@ -160,7 +160,7 @@ export class SocketClient implements ChainInterface {
     subscriber: UtxoSource,
     toAddress: Bech32Address,
   ) => {
-    this.log(`subscribed to address ${toAddress}`);
+    this.log(`subscribed to address ${toAddress.concise()}`);
     this.utxoSubscribers.add(subscriber);
     this.subscribedAddresses.add(toAddress.bech32);
     const msg: AddressSubscriptionMsg = {

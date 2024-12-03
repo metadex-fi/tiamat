@@ -5,6 +5,7 @@ import { Wallet } from "../../state/wallet";
 import { WalletUtxos } from "../zygote";
 import { Plexus } from "../plexus";
 import { PDappConfigT, PDappParamsT } from "../../../types/tiamat/tiamat";
+import { Sent } from "../../state/utxoSource";
 
 export type WalletUtxosGanglion = Ganglion<WalletUtxos[], WalletUtxos>;
 
@@ -40,8 +41,8 @@ export class WalletUtxosPlexus<
       senseWalletUtxos,
     );
   }
-  public myelinate = (from: string[]): void => {
+  public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
     const from_ = [...from, `WalletUtxosPlexus`];
-    this.walletUtxosGanglion.myelinate(from_);
+    return await this.walletUtxosGanglion.myelinate(from_);
   };
 }

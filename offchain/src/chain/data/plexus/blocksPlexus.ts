@@ -1,5 +1,5 @@
 import { Trace } from "../../../utils/wrappers";
-import { UtxoSource } from "../../🕯️";
+import { Sent, UtxoSource } from "../../state/utxoSource";
 import { Ganglion } from "../ganglion";
 import { Plexus } from "../plexus";
 import { BlocksStem, identityProcedure } from "../stem";
@@ -33,8 +33,8 @@ export class BlocksPlexus extends Plexus {
       senseBlock,
     );
   }
-  public myelinate = (from: string[]): void => {
+  public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
     const from_ = [...from, `BlocksPlexus`];
-    this.blocksGanglion.myelinate(from_);
+    return await this.blocksGanglion.myelinate(from_);
   };
 }

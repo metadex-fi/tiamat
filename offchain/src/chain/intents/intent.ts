@@ -18,6 +18,7 @@ import { Sent } from "../state/utxoSource";
 import { Callback } from "../state/callback";
 import { errorTimeoutMs } from "../../utils/constants";
 import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
+import { TiamatContract } from "../state/tiamatContract";
 
 /**
  * Handler to apply the various potential fixes for some intended user action, and produce a tx to fix them,
@@ -26,6 +27,7 @@ import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
 export abstract class Intent<
   DC extends PDappConfigT,
   DP extends PDappParamsT,
+  CT extends TiamatContract<DC, DP>,
   ChoicesT extends Zygote,
   StatusT extends Zygote,
 > {
@@ -35,7 +37,7 @@ export abstract class Intent<
     `choosing`;
 
   constructor(
-    private readonly user: TiamatUser<DC, DP>, // TODO better type
+    private readonly user: TiamatUser<DC, DP, CT>, // TODO better type
     chainGanglion: Ganglion<any, StatusT>, // The "summary" of all chain updates
     private readonly mkDefaultChoices: () => ChoicesT,
     defaultStatus: StatusT,

@@ -113,12 +113,22 @@ class MatrixNexusBlocksGanglion<
       const matrix = maybeMatrix as MaybeMatrix;
       const nexus = maybeNexus as MaybeNexus<DC, DP>;
       const block = maybeBlock as BlockHeight;
-      assert(
-        typeof matrix.maybeUtxo !== `string` &&
-          typeof nexus.maybeUtxo !== `string` &&
-          typeof block.maybeBlock !== `string`,
-        `ElectionPreconPlexus: matrix (${matrix.maybeUtxo}) and/or nexus (${nexus.maybeUtxo})  and/or block (${block.maybeBlock}) not valid`,
-      );
+      if (
+        typeof matrix.maybeUtxo === `string` ||
+        typeof nexus.maybeUtxo === `string` ||
+        typeof block.maybeBlock === `string`
+      ) {
+        throw {
+          name: `AbortError`,
+          message: `ElectionPreconPlexus: matrix (${matrix.maybeUtxo}) and/or nexus (${nexus.maybeUtxo})  and/or block (${block.maybeBlock}) not valid`,
+        };
+      }
+      // assert(
+      //   typeof matrix.maybeUtxo !== `string` &&
+      //     typeof nexus.maybeUtxo !== `string` &&
+      //     typeof block.maybeBlock !== `string`,
+      //   `ElectionPreconPlexus: matrix (${matrix.maybeUtxo}) and/or nexus (${nexus.maybeUtxo})  and/or block (${block.maybeBlock}) not valid`,
+      // );
 
       return Promise.resolve(
         new MatrixNexusBlock(
@@ -396,10 +406,13 @@ export class ElectionsPlexus<
     this.nextElectionGanglion.innervateEffector(nextElectionEffector);
   };
 
-  public myelinate = (from: string[]): void => {
+  public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
     const from_ = [...from, `ElectionPreconPlexus`];
-    this.matrixNexusBlocksGanglion.myelinate(from_);
-    this.currentElectionGanglion.myelinate(from_);
-    this.nextElectionGanglion.myelinate(from_);
+    const result = await Promise.all([
+      this.matrixNexusBlocksGanglion.myelinate(from_),
+      this.currentElectionGanglion.myelinate(from_),
+      this.nextElectionGanglion.myelinate(from_),
+    ]);
+    return result.flat();
   };
 }

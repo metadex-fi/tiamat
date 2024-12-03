@@ -56,42 +56,40 @@ export class Wallet {
 
     this.eventsSemaphore = new Simplephore(`${this.name} Events`);
 
-    const walletOrAddress =
-      forWalletOrAddress === `allWalletAddresses`
-        ? blaze.wallet
-        : forWalletOrAddress;
-
-    this.subscribeToWalletUtxos(
-      walletOrAddress,
-      new Callback(
-        `always`,
-        [this.name, `constructor`],
-        async (utxoEvents, trace) => {
-          if (this.eventsSemaphore.busy) {
-            this.eventQueue.push(utxoEvents);
-            return await Promise.resolve([`${this.name} - busy`]);
-          } else {
-            const eventsID = this.eventsSemaphore.latch(
-              `${this.name}.constructor.subscribeToWalletUtxos`,
-            );
-            this.processEvents([utxoEvents]);
-            let nextEvents = this.eventQueue.splice(0);
-            while (nextEvents.length) {
-              this.processEvents(nextEvents);
-              nextEvents = this.eventQueue.splice(0);
-            }
-            this.eventsSemaphore.discharge(eventsID);
-            const result = await this.processCallbacks(
-              trace.calledFrom(this.name, `constructor`),
-            );
-            result.push(
-              `${this.name}: processed ${utxoEvents.events.length} events`,
-            );
-            return result;
+    const callback = new Callback<UtxoEvents>(
+      `always`,
+      [this.name, `constructor`],
+      async (utxoEvents, trace) => {
+        if (this.eventsSemaphore.busy) {
+          this.eventQueue.push(utxoEvents);
+          return await Promise.resolve([`${this.name} - busy`]);
+        } else {
+          const eventsID = this.eventsSemaphore.latch(
+            `${this.name}.constructor.subscribeToWalletUtxos`,
+          );
+          this.processEvents([utxoEvents]);
+          let nextEvents = this.eventQueue.splice(0);
+          while (nextEvents.length) {
+            this.processEvents(nextEvents);
+            nextEvents = this.eventQueue.splice(0);
           }
-        },
-      ),
+          this.eventsSemaphore.discharge(eventsID);
+          const result = await this.processCallbacks(
+            trace.calledFrom(this.name, `constructor`),
+          );
+          result.push(
+            `${this.name}: processed ${utxoEvents.events.length} events`,
+          );
+          return result;
+        }
+      },
     );
+
+    if (forWalletOrAddress === `allWalletAddresses`) {
+      this.subscribeToWalletUtxos(blaze.wallet, callback);
+    } else {
+      this.subscribeToAddressUtxos(forWalletOrAddress, callback);
+    }
   }
 
   /**
@@ -148,7 +146,7 @@ export class Wallet {
    * @param callback
    */
   private subscribeToWalletUtxos = (
-    walletOrAddress: BlazeWallet | Bech32Address,
+    wallet: BlazeWallet,
     callback: Callback<UtxoEvents>,
   ) => {
     /*
@@ -158,13 +156,28 @@ export class Wallet {
     if we get a full wallet with potentially multiple addresses,
     we instead subscribe to that.
     */
-    if (walletOrAddress instanceof BlazeWallet) {
-      this.log(`subscribed to utxos of entire wallet`);
-      this.subscribeToWalletAddresses(walletOrAddress, callback);
-    } else {
-      this.log(`subscribed to utxos of single address`);
-      this.subscribeToAddress(walletOrAddress, callback);
-    }
+    this.log(`subscribed to utxos of entire wallet`);
+    this.subscribeToWalletAddresses(wallet, callback);
+  };
+
+  /**
+   *
+   * @param walletOrAddress
+   * @param callback
+   */
+  private subscribeToAddressUtxos = (
+    address: Bech32Address,
+    callback: Callback<UtxoEvents>,
+  ) => {
+    /*
+      if we get a single address, we proceed as before.
+      (some wallet types have only one address)
+  
+      if we get a full wallet with potentially multiple addresses,
+      we instead subscribe to that.
+      */
+    this.log(`subscribed to utxos of single address`);
+    this.subscribeToAddress(address, callback);
   };
 
   /**
@@ -186,8 +199,12 @@ export class Wallet {
     const recordedAddresses = new AssocMap<Bech32Address, true>(
       (a) => a.bech32,
     );
+    let i = 0;
     for (const walletAddress of walletAddresses) {
-      const recordedAddress = Bech32Address.fromBlaze(walletAddress);
+      const recordedAddress = Bech32Address.fromBlaze(
+        `${this.name} address #${i++}`,
+        walletAddress,
+      );
       recordedAddresses.set(recordedAddress, true);
       this.subscribeToAddress(recordedAddress, callback);
     }
@@ -202,10 +219,15 @@ export class Wallet {
         [this.name, `subscribeToWalletAddresses`],
         async (_block, _trace) => {
           let updated = 0;
+          let i = 0;
           for (const [wallet, recordedAddresses] of this.walletSubscriptions) {
             const walletAddresses = await wallet.getUsedAddresses();
+            let j = 0;
             for (const walletAddress of walletAddresses) {
-              const recordedAddress = Bech32Address.fromBlaze(walletAddress);
+              const recordedAddress = Bech32Address.fromBlaze(
+                `${this.name} subscription #${i++}  address #${j++}`,
+                walletAddress,
+              );
               if (recordedAddresses.has(recordedAddress)) continue;
               recordedAddresses.set(recordedAddress, true);
               this.subscribeToAddress(recordedAddress, callback);
@@ -227,17 +249,18 @@ export class Wallet {
     address: Bech32Address,
     callback: Callback<UtxoEvents>,
   ) => {
-    this.log(`subscribed to utxos of ${address.bech32}`);
+    const concise = address.concise();
+    this.log(`subscribed to utxos of ${concise}`);
     this.utxoSource.subscribeToAddress(
       this,
       address,
       new Callback(
         callback.perform,
-        [this.name, `subscribeToAddress`],
+        [this.name, `subscribeToAddress`, concise],
         async (walletUtxos, trace) => {
           return await callback.run(
             walletUtxos,
-            `${this.name}.subscribeToAddress`,
+            `${this.name}.subscribeToAddress(${concise})`,
             trace,
           );
         },

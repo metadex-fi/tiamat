@@ -6,6 +6,7 @@ import { Wallet } from "../../state/wallet";
 import { Plexus } from "../plexus";
 import { PDappConfigT, PDappParamsT } from "../../../types/tiamat/tiamat";
 import { WalletFunds } from "../zygote";
+import { Sent } from "../../state/utxoSource";
 
 /**
  *
@@ -40,8 +41,8 @@ export class WalletFundsPlexus<
     );
   }
 
-  public myelinate = (from: string[]): void => {
+  public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
     const from_ = [...from, `WalletFundsPlexus: ${this.wallet.name}`];
-    this.walletFundsGanglion.myelinate(from_);
+    return await this.walletFundsGanglion.myelinate(from_);
   };
 }

@@ -8,6 +8,7 @@ import { Ganglion } from "../ganglion";
 import { identityProcedure, SvmStem } from "../stem";
 import { MaybeSvmUtxo } from "../zygote";
 import { Plexus } from "../plexus";
+import { Sent } from "../../state/utxoSource";
 
 export class SvmUtxoPlexus<
   PConfig extends PData,
@@ -66,8 +67,8 @@ export class SvmUtxoPlexus<
     );
   }
 
-  public myelinate = (from: string[]): void => {
+  public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
     const from_ = [...from, `SvmUtxoPlexus`];
-    this.svmUtxoGanglion.myelinate(from_);
+    return await this.svmUtxoGanglion.myelinate(from_);
   };
 }

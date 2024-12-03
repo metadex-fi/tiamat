@@ -108,7 +108,7 @@ export interface ChainInterface {
     fromAddress: Bech32Address,
   ) => void;
   subscribeToNewBlock: (subscriber: UtxoSource) => void;
-  // subscribeToAck: (subscriber: UtxoPubSub) => void;
+  // subscribeToAck: (subscriber: UtxoSource) => void;
   submitUntippedTx: (
     tx: Core.Transaction,
     trace: Trace,
@@ -123,7 +123,7 @@ export interface ChainInterface {
   ) => Promise<(string | Sent)[]>;
 }
 
-const defaultName = `(unnamed) UtxoPubSub`;
+const defaultName = `(unnamed) UtxoSource`;
 
 /**
  *
@@ -169,7 +169,7 @@ export class UtxoSource {
   public static createSocketSingleton(socketClient: SocketClient): UtxoSource {
     assert(
       !UtxoSource.socketSingleton,
-      `UtxoPubSub: socketSingleton already exists`,
+      `UtxoSource: socketSingleton already exists`,
     );
     UtxoSource.socketSingleton = new UtxoSource(socketClient);
     return UtxoSource.socketSingleton;
@@ -184,7 +184,7 @@ export class UtxoSource {
   ): UtxoSource {
     assert(
       !UtxoSource.kupmiosSingleton,
-      `UtxoPubSub: kupmiosSingleton already exists`,
+      `UtxoSource: kupmiosSingleton already exists`,
     );
     UtxoSource.kupmiosSingleton = new UtxoSource(socketKupmios);
     return UtxoSource.kupmiosSingleton;
@@ -196,7 +196,7 @@ export class UtxoSource {
   public static getSocketSingleton(): UtxoSource {
     assert(
       UtxoSource.socketSingleton,
-      `UtxoPubSub: vectorSingleton does not exist`,
+      `UtxoSource: vectorSingleton does not exist`,
     );
     return UtxoSource.socketSingleton;
   }
@@ -207,7 +207,7 @@ export class UtxoSource {
   public static getKupmiosSingleton(): UtxoSource {
     assert(
       UtxoSource.kupmiosSingleton,
-      `UtxoPubSub: kupmiosSingleton does not exist`,
+      `UtxoSource: kupmiosSingleton does not exist`,
     );
     return UtxoSource.kupmiosSingleton;
   }
@@ -221,7 +221,7 @@ export class UtxoSource {
       this.name === defaultName,
       `${this.name}: name already changed from default "${defaultName}"`,
     );
-    this.name = `${name} UtxoPubSub`;
+    this.name = `${name} UtxoSource`;
     const instance = UtxoSource.instances.get(this.name) ?? 0;
     UtxoSource.instances.set(this.name, instance + 1);
     if (instance) this.name = `${this.name}#${instance}`;
@@ -245,18 +245,19 @@ export class UtxoSource {
     address: Bech32Address,
     callback: Callback<UtxoEvents>,
   ) => {
-    this.log(`subscribeToAddress:`, address);
+    const concise = address.concise();
+    this.log(`subscribeToAddress:`, concise);
     assert(
       subscriber instanceof TiamatSvm || subscriber instanceof Wallet,
       `${this.name}.subscribeToAddress: subscriber neither TiamatSvm nor Wallet`,
     );
     assert(
       this.chainInterface,
-      `${this.name}: no socketClient in dummy UtxoPubSub`,
+      `${this.name}: no socketClient in dummy UtxoSource`,
     );
     const addressCallbacks = this.addressCallbacks.get(address);
     if (addressCallbacks) {
-      this.log(`already subscribed to ${address}`);
+      this.log(`already subscribed to ${concise}`);
       addressCallbacks.push(callback);
     } else {
       this.addressCallbacks.set(address, [callback]);
@@ -269,7 +270,7 @@ export class UtxoSource {
   //   address: Bech32Address,
   // ) => {
   //   this.log(`unsubscribeFromAddress:`, address);
-  //   assert(this.chainInterface, "no socketClient in dummy UtxoPubSub");
+  //   assert(this.chainInterface, "no socketClient in dummy UtxoSource");
   //   const found = this.addressCallbacks.delete(address);
   //   assert(found, `no subscriptions to ${address}`);
   //   if (!this.addressMsgsIDs.has(address)) {
@@ -284,7 +285,7 @@ export class UtxoSource {
    * @param callback
    */
   public subscribeToAddressMsgs = (
-    subscriber: SocketServer<any, any>,
+    subscriber: SocketServer<any, any, any>,
     address: Bech32Address,
     id: string,
     callback: Callback<string>,
@@ -294,7 +295,7 @@ export class UtxoSource {
       subscriber instanceof SocketServer,
       `${this.name}.subscribeToAddressMsgs: subscriber not a SocketServer`,
     );
-    assert(this.chainInterface, `no socketClient in dummy UtxoPubSub`);
+    assert(this.chainInterface, `no socketClient in dummy UtxoSource`);
     this.idMsgsCallbacks.set(id, callback);
     const addressMsgsIDs = this.addressMsgsIDs.get(address);
     if (addressMsgsIDs) {
@@ -346,7 +347,7 @@ export class UtxoSource {
    * @param id
    */
   public unsubscribeFromAddressMsgs = (
-    subscriber: SocketServer<any, any>,
+    subscriber: SocketServer<any, any, any>,
     address: Bech32Address,
     id: string,
   ) => {
@@ -357,7 +358,7 @@ export class UtxoSource {
     );
     assert(
       this.chainInterface,
-      `${this.name}: no socketClient in dummy UtxoPubSub`,
+      `${this.name}: no socketClient in dummy UtxoSource`,
     );
     const addressMsgsIDs = this.addressMsgsIDs.get(address);
     assert(addressMsgsIDs, `${this.name}: no subscriptions to ${address}`);
@@ -373,7 +374,7 @@ export class UtxoSource {
    * @param callback
    */
   public subscribeToNewBlock = (
-    subscriber: Wallet | BlocksStem | SocketServer<any, any>,
+    subscriber: Wallet | BlocksStem | SocketServer<any, any, any>,
     callback: Callback<number>,
   ): Promise<(string | Sent)[]> => {
     this.log(`subscribeToNewBlock`);
@@ -390,7 +391,7 @@ export class UtxoSource {
     this.subscribedToNewBlock = true;
     assert(
       this.chainInterface,
-      `${this.name}: no socketClient in dummy UtxoPubSub`,
+      `${this.name}: no socketClient in dummy UtxoSource`,
     );
     this.chainInterface.subscribeToNewBlock(this);
     return Promise.resolve([
@@ -404,7 +405,7 @@ export class UtxoSource {
   //   if (this.subscribedToAck) return;
 
   //   this.subscribedToAck = true;
-  //   assert(this.chainInterface, "no socketClient in dummy UtxoPubSub");
+  //   assert(this.chainInterface, "no socketClient in dummy UtxoSource");
   //   this.chainInterface.subscribeToAck(this);
   // };
 
@@ -437,8 +438,12 @@ export class UtxoSource {
     const addressEvents = new AssocMap<Bech32Address, UtxoEvents>(
       (b) => b.bech32,
     );
+    let i = 0;
     for (const event of events.events) {
-      const address = Bech32Address.fromUtxo(event.utxo);
+      const address = Bech32Address.fromUtxo(
+        `from UtxoEvent ${i++}`,
+        event.utxo,
+      );
       const events_ = addressEvents.get(address);
       if (events_) {
         events_.events.push(event);
@@ -621,7 +626,7 @@ export class UtxoSource {
     this.log(`submitting to chain interface`);
     assert(
       this.chainInterface,
-      `${this.name}: no socketClient in dummy UtxoPubSub`,
+      `${this.name}: no socketClient in dummy UtxoSource`,
     );
     // const txId = TxId.fromCoreBody(tx.txSigned.body());
     // const ackCallbacks = this.ackCallbacks.get(txId);
@@ -655,7 +660,7 @@ export class UtxoSource {
     this.log(`submitTippedTxes`);
     assert(
       this.chainInterface,
-      `${this.name}: no socketClient in dummy UtxoPubSub`,
+      `${this.name}: no socketClient in dummy UtxoSource`,
     );
     // for (const tx of txes) {
     //   const vkeys = tx.tx.partiallySignedPayloadTx.witnessSet().vkeys()?.values();
@@ -695,7 +700,7 @@ export class UtxoSource {
     );
     assert(
       this.chainInterface,
-      `${this.name}: no socketClient in dummy UtxoPubSub`,
+      `${this.name}: no socketClient in dummy UtxoSource`,
     );
     // for (const tx of txes) {
     //   const txId = TxId.fromCoreBody(

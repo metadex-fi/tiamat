@@ -32,13 +32,14 @@ const slotDurationMs_ = BigInt(slotDurationMs);
 const blockDurationMs_ = BigInt(blockDurationMs);
 
 export interface EmulatorPhase<
-  UserT extends TiamatUser<DC, DP>,
   DC extends PDappConfigT,
   DP extends PDappParamsT,
+  CT extends TiamatContract<DC, DP>,
+  UT extends TiamatUser<DC, DP, CT>,
 > {
   name: string;
   numBlocks: number;
-  mkFn?: (users: UserT[]) => () => Promise<void>;
+  mkFn?: (users: UT[]) => () => Promise<void>;
 }
 
 export interface EmulatorParams {
@@ -56,16 +57,16 @@ export interface EmulatorParams {
 }
 
 export class TiamatEmulator<
-  ContractT extends TiamatContract<DC, DP>,
-  UserT extends TiamatUser<DC, DP>,
   DC extends PDappConfigT,
   DP extends PDappParamsT,
+  CT extends TiamatContract<DC, DP>,
+  UT extends TiamatUser<DC, DP, CT>,
 > {
   private readonly tiamatParams: TiamatParams;
   private readonly eigenBlaze: Core.AssetId;
 
   constructor(
-    private readonly phases: EmulatorPhase<UserT, DC, DP>[],
+    private readonly phases: EmulatorPhase<DC, DP, CT, UT>[],
     private readonly mkContract: (
       name: string,
       networkId: Core.NetworkId,
@@ -73,7 +74,7 @@ export class TiamatEmulator<
       nexusID: Token,
       matrixID: Token,
       matrixNexusTolerance: number,
-    ) => ContractT,
+    ) => CT,
     private readonly mkTestingUser: (
       name: string,
       provider: EmulatorProvider,
@@ -84,7 +85,7 @@ export class TiamatEmulator<
       ownerPKey: Core.Bip32PrivateKeyHex,
       servitorPKey: Core.Bip32PrivateKeyHex,
       port: number,
-    ) => Promise<UserT>,
+    ) => Promise<UT>,
     private readonly dappConfig: PLifted<DC>,
     private readonly dappParams: PLifted<DP>,
     private readonly pdappConfig: DC,
@@ -141,7 +142,10 @@ export class TiamatEmulator<
         this.emulatorParams.networkId,
       );
       addresses.push({
-        address: Bech32Address.fromBlaze(address.address),
+        address: Bech32Address.fromBlaze(
+          `Emulator Address #${i}`,
+          address.address,
+        ),
         privateKey: privateKey.hex(),
       });
     }
@@ -157,7 +161,7 @@ export class TiamatEmulator<
     targetPort: number,
     minStake: bigint,
     maxStake: bigint,
-  ): Promise<SocketServer<DC, DP>> => {
+  ): Promise<SocketServer<DC, DP, CT>> => {
     const name = `${targetIP}:${targetPort}`;
     const socketEmulator = SocketKupmios.newSocketEmulator(name, emulator);
     console.log("created socketEmulator");
@@ -188,7 +192,7 @@ export class TiamatEmulator<
 
     const targetStake = minStake + genNonNegative(maxStake - minStake);
     const privateKey = Core.Bip32PrivateKey.fromHex(privateKeyHex);
-    const socketServer = await SocketServer.newTestingInstance(
+    const socketServer = await SocketServer.newTestingInstance<DC, DP, CT>(
       privateKey,
       targetIP,
       targetPort,
@@ -210,7 +214,7 @@ export class TiamatEmulator<
     matrixID: Token,
     ownerPKey: Core.Bip32PrivateKeyHex,
     port: number,
-  ): Promise<UserT> => {
+  ): Promise<UT> => {
     console.log(`creating EmulatorProvider`);
     const provider = new EmulatorProvider(emulator);
     console.log(`creating servitor mnemonic`);
@@ -388,7 +392,7 @@ export class TiamatEmulator<
         }
 
         // generate servers
-        const vectors: SocketServer<DC, DP>[] = [];
+        const vectors: SocketServer<DC, DP, CT>[] = [];
         const vectorAddresses: Bech32Address[] = [];
         let port = 8080;
         for (let i = 1; i < numVectors + 1n; i++) {
@@ -418,11 +422,11 @@ export class TiamatEmulator<
 
         console.log(`GENERATING USERS\n`);
         // generate users
-        const users: UserT[] = [];
+        const users: UT[] = [];
         for (let i = numVectors + 1n; i < addresses.length; i++) {
           console.log(`generating user #${users.length + 1}`);
           const user = await this.generateUser(
-            `user_${users.length + 1}`,
+            `U${users.length + 1}`,
             emulator,
             seed.nexusID,
             seed.matrixID,

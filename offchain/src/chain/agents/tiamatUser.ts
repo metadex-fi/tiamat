@@ -8,7 +8,7 @@ import {
 import assert from "assert";
 import { Wallet } from "../state/wallet";
 import { SocketClient } from "./socketClient";
-import { UtxoSource } from "../state/utxoSource";
+import { Sent, UtxoSource } from "../state/utxoSource";
 import { Token } from "../../types/general/derived/asset/token";
 import { Bech32Address, UtxoSet, Trace, Tx, P, W } from "../../utils/wrappers";
 import { TiamatContract } from "../state/tiamatContract";
@@ -21,6 +21,7 @@ import { Effector } from "../data/effector";
 import { Callback } from "../state/callback";
 import { BlockHeight } from "../data/zygote";
 import { ElectionData } from "../state/electionData";
+import { TiamatCortex } from "../state/tiamatCortex";
 
 type MkContractT<
   DC extends PDappConfigT,
@@ -41,12 +42,13 @@ type MkUserT<
   DC extends PDappConfigT,
   DP extends PDappParamsT,
   CT extends TiamatContract<DC, DP>,
-  UT extends TiamatUser<DC, DP>,
+  UT extends TiamatUser<DC, DP, CT>,
   WT extends BlazeWallet,
 > = (
   name: string,
   contract: CT,
   socketClient: SocketClient,
+  blockfrost: Provider,
   ownerBlaze: Blaze<Provider, WT>,
   servitorBlaze: Blaze<Provider, HotWallet>,
   servitorAddress: Bech32Address,
@@ -56,7 +58,7 @@ type AsyncMkUserT<
   DC extends PDappConfigT,
   DP extends PDappParamsT,
   CT extends TiamatContract<DC, DP>,
-  UT extends TiamatUser<DC, DP>,
+  UT extends TiamatUser<DC, DP, CT>,
   WT extends BlazeWallet,
 > = (
   name: string,
@@ -77,16 +79,18 @@ type AsyncMkUserT<
 export abstract class TiamatUser<
   DC extends PDappConfigT,
   DP extends PDappParamsT,
+  CT extends TiamatContract<DC, DP>,
 > {
   protected static instances = new Map<string, number>();
-  protected static singleton?: TiamatUser<any, any>;
+  protected static singleton?: TiamatUser<any, any, any>;
 
   public readonly ownerWallet: Wallet;
   public readonly servitorWallet: Wallet;
 
+  public readonly cortex: TiamatCortex<DC, DP, CT>;
   public readonly servitorFundsPlexus: WalletFundsPlexus<DC, DP>;
   public readonly ownerFundsPlexus: WalletFundsPlexus<DC, DP>;
-  public readonly servitorPreconPlexus: ServitorPreconPlexus<DC, DP>;
+  public readonly servitorPreconPlexus: ServitorPreconPlexus<DC, DP, CT>;
 
   // mainly for blocking during election-margins
   public readonly actionSemaphore = new Semaphore(`Action`);
@@ -108,7 +112,7 @@ export abstract class TiamatUser<
     DC extends PDappConfigT,
     DP extends PDappParamsT,
     CT extends TiamatContract<DC, DP>,
-    UT extends TiamatUser<DC, DP>,
+    UT extends TiamatUser<DC, DP, CT>,
     WT extends BlazeWallet,
   >(
     name: string,
@@ -173,7 +177,8 @@ export abstract class TiamatUser<
   public static getSingleton<
     DC extends PDappConfigT,
     DP extends PDappParamsT,
-  >(): TiamatUser<DC, DP> {
+    CT extends TiamatContract<DC, DP>,
+  >(): TiamatUser<DC, DP, CT> {
     assert(TiamatUser.singleton, `singleton does not exist`);
     return TiamatUser.singleton;
   }
@@ -192,8 +197,8 @@ export abstract class TiamatUser<
   protected static newTestingInstance = async <
     DC extends PDappConfigT,
     DP extends PDappParamsT,
-    UT extends TiamatUser<DC, DP>,
     CT extends TiamatContract<DC, DP>,
+    UT extends TiamatUser<DC, DP, CT>,
   >(
     name: string,
     provider: Provider,
@@ -252,7 +257,7 @@ export abstract class TiamatUser<
     DC extends PDappConfigT,
     DP extends PDappParamsT,
     CT extends TiamatContract<DC, DP>,
-    UT extends TiamatUser<DC, DP>,
+    UT extends TiamatUser<DC, DP, CT>,
     WT extends BlazeWallet,
   >(
     name: string,
@@ -295,25 +300,13 @@ export abstract class TiamatUser<
       pdappParams,
     );
 
-    const [matrixUtxos, nexusUtxos] = await Promise.all([
-      blockfrost.getUnspentOutputs(contract.matrix.address.blaze),
-      blockfrost.getUnspentOutputs(contract.nexus.address.blaze),
-    ]);
-    assert(
-      matrixUtxos.length === 1,
-      `${name}: expected exactly one matrix utxo, got ${matrixUtxos.length}`,
-    );
-    assert(
-      nexusUtxos.length === 1,
-      `${name}: expected exactly one nexus utxo, got ${nexusUtxos.length}`,
-    );
-
     const servitorAddresses = await servitorBlaze.wallet.getUsedAddresses();
     assert(
       servitorAddresses.length === 1,
       `servitorAddresses.length !== 1: ${servitorAddresses.length}`,
     );
     const servitorAddress = await Bech32Address.fromHotWallet(
+      `servitor`,
       servitorBlaze.wallet,
     );
 
@@ -321,26 +314,42 @@ export abstract class TiamatUser<
       name,
       contract,
       socketClient,
+      blockfrost,
       ownerBlaze,
       servitorBlaze,
       servitorAddress,
     );
 
-    await utxoSource.initialNotifyUtxoEvents(
+    return user;
+  };
+
+  public initBlockfrostMatrixNexus = async () => {
+    const [matrixUtxos, nexusUtxos] = await Promise.all([
+      this.blockfrost.getUnspentOutputs(this.contract.matrix.address.blaze),
+      this.blockfrost.getUnspentOutputs(this.contract.nexus.address.blaze),
+    ]);
+    assert(
+      matrixUtxos.length === 1,
+      `${this.name}: expected exactly one matrix utxo, got ${matrixUtxos.length}`,
+    );
+    assert(
+      nexusUtxos.length === 1,
+      `${this.name}: expected exactly one nexus utxo, got ${nexusUtxos.length}`,
+    );
+
+    await this.contract.utxoSource.initialNotifyUtxoEvents(
       UtxoSet.fromList([
         {
           core: matrixUtxos[0]!,
-          trace: Trace.source(`INIT`, name),
+          trace: Trace.source(`INIT`, this.name),
         },
         {
           core: nexusUtxos[0]!,
-          trace: Trace.source(`INIT`, name),
+          trace: Trace.source(`INIT`, this.name),
         },
       ]),
-      Trace.source(`INIT`, `${name}.new`),
+      Trace.source(`INIT`, `${this.name}.initBlockfrostMatrixNexus`),
     );
-
-    return user;
   };
 
   /**
@@ -355,6 +364,7 @@ export abstract class TiamatUser<
     public readonly name: string,
     public readonly contract: TiamatContract<DC, DP>,
     socketClient: SocketClient,
+    private readonly blockfrost: Provider, // for initial matrix and nexus
     protected readonly ownerBlaze: Blaze<P, W>,
     protected readonly servitorBlaze: Blaze<P, W>,
     public readonly servitorAddress: Bech32Address,
@@ -383,7 +393,9 @@ export abstract class TiamatUser<
       this.ownerFundsPlexus,
     );
 
-    this.contract.blocksPlexus.blocksGanglion.innervateEffector(
+    this.cortex = new TiamatCortex(name, contract);
+
+    this.cortex.blocksPlexus.blocksGanglion.innervateEffector(
       new Effector(
         new Callback(
           `always`,
@@ -405,18 +417,21 @@ export abstract class TiamatUser<
       ),
     );
 
-    this.contract.electionsPlexus.innervateMarginEffectors(
+    this.cortex.electionsPlexus.innervateMarginEffectors(
       this.lockDuringMargins,
       socketClient.updateConnections,
     );
   }
 
-  protected myelinate = (from: string[]) => {
+  protected myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
     const from_ = [...from, `TiamatUser: ${this.name}`];
-    this.servitorFundsPlexus.myelinate(from_);
-    this.ownerFundsPlexus.myelinate(from_);
-    this.servitorPreconPlexus.myelinate(from_);
-    this.contract.myelinate(from_);
+    const result = await Promise.all([
+      this.servitorFundsPlexus.myelinate(from_),
+      this.ownerFundsPlexus.myelinate(from_),
+      this.servitorPreconPlexus.myelinate(from_),
+      this.cortex.myelinate(from_),
+    ]);
+    return result.flat();
   };
 
   protected lockDuringMargins = async (_election: ElectionData<DC, DP>) => {

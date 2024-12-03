@@ -66,11 +66,16 @@ import {
 } from "ws";
 import { getEd25519KeyHashHex } from "../../utils/conversions";
 import { Effector } from "../data/effector";
+import { TiamatCortex } from "../state/tiamatCortex";
 
 /**
  *
  */
-export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
+export class SocketServer<
+  DC extends PDappConfigT,
+  DP extends PDappParamsT,
+  CT extends TiamatContract<DC, DP>,
+> {
   private static instances = new Map<string, number>();
   private readonly name: string;
 
@@ -93,12 +98,14 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
   private eligible = false;
   // private ipInSync = false; // TODO manage and make use of this (not a priority rn)
 
-  private static singleton?: SocketServer<any, any>;
+  private static singleton?: SocketServer<any, any, any>;
   private server?: Server;
   private retryConnectTimeout?: NodeJS.Timeout;
   private counterConnectTimeout?: NodeJS.Timeout;
   private connectionCheckTimeout?: NodeJS.Timeout;
   private active = true;
+
+  private readonly cortex: TiamatCortex<DC, DP, CT>;
 
   /**
    *
@@ -120,7 +127,7 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
     public readonly targetStake: bigint,
     private readonly utxoSource: UtxoSource,
     private readonly socketKupmios: SocketKupmios,
-    private readonly contract: TiamatContract<DC, DP>,
+    private readonly contract: CT,
     private readonly blaze: Blaze<P, W>,
   ) {
     this.ownIpPort = {
@@ -147,7 +154,9 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
     this.log(`targetOwnPort:`, this.targetOwnPort);
     this.log(`targetStake:`, this.targetStake);
 
-    contract.electionsPlexus.innervateMarginEffectors(
+    this.cortex = new TiamatCortex<DC, DP, CT>(this.name, contract);
+
+    this.cortex.electionsPlexus.innervateMarginEffectors(
       this.maybeAcceptConnections,
       this.updateElectionConnections,
     );
@@ -237,7 +246,7 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
     //   ),
     // );
 
-    contract.matrixPlexus.svmUtxoGanglion.innervateEffector(
+    this.cortex.matrixPlexus.svmUtxoGanglion.innervateEffector(
       new Effector(
         new Callback(
           `always`,
@@ -274,6 +283,7 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
   public static async newTestingInstance<
     DC extends PDappConfigT,
     DP extends PDappParamsT,
+    CT extends TiamatContract<DC, DP>,
   >(
     ownPrivateKey: Core.Bip32PrivateKey,
     targetOwnIP: string,
@@ -281,16 +291,16 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
     targetStake: bigint,
     utxoSource: UtxoSource,
     socketKupmios: SocketKupmios,
-    contract: TiamatContract<DC, DP>,
+    contract: CT,
     blaze: Blaze<P, W>,
-  ): Promise<SocketServer<DC, DP>> {
+  ): Promise<SocketServer<DC, DP, CT>> {
     const { publicKey } = await HotWallet.generateAccountAddressFromMasterkey(
       ownPrivateKey,
       contract.networkId,
     );
     const ownPublicKeyHash = await getEd25519KeyHashHex(publicKey);
     // await contract.startWatchingElection();
-    return new SocketServer(
+    const socketServer = new SocketServer<DC, DP, CT>(
       // ownPrivateKey,
       ownPublicKeyHash,
       targetOwnIP,
@@ -301,6 +311,9 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
       contract,
       blaze,
     );
+
+    await socketServer.myelinate([`SocketServer.newTestingInstance`]);
+    return socketServer;
   }
 
   /**
@@ -317,6 +330,7 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
   public static async createSingleton<
     DC extends PDappConfigT,
     DP extends PDappParamsT,
+    CT extends TiamatContract<DC, DP>,
   >(
     ownPrivateKey: Core.Bip32PrivateKey,
     targetOwnIP: string,
@@ -324,9 +338,9 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
     targetStake: bigint,
     utxoSource: UtxoSource,
     socketKupmios: SocketKupmios,
-    contract: TiamatContract<DC, DP>,
+    contract: CT,
     blaze: Blaze<P, W>,
-  ): Promise<SocketServer<DC, DP>> {
+  ): Promise<SocketServer<DC, DP, CT>> {
     assert(!SocketServer.singleton, `singleton already exists`);
     const { publicKey } = await HotWallet.generateAccountAddressFromMasterkey(
       ownPrivateKey,
@@ -334,7 +348,7 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
     );
     const ownPublicKeyHash = await getEd25519KeyHashHex(publicKey);
     // await contract.startWatchingElection();
-    SocketServer.singleton = new SocketServer<DC, DP>(
+    SocketServer.singleton = new SocketServer<DC, DP, CT>(
       // ownPrivateKey,
       ownPublicKeyHash,
       targetOwnIP,
@@ -345,7 +359,9 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
       contract,
       blaze,
     );
-    return SocketServer.singleton as SocketServer<DC, DP>; // TODO this is a hack
+
+    await SocketServer.singleton.myelinate([`SocketServer.createSingleton`]);
+    return SocketServer.singleton;
   }
 
   /**
@@ -354,9 +370,10 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
   public static getSingleton<
     DC extends PDappConfigT,
     DP extends PDappParamsT,
-  >(): SocketServer<DC, DP> {
+    CT extends TiamatContract<DC, DP>,
+  >(): SocketServer<DC, DP, CT> {
     assert(SocketServer.singleton, `singleton does not exist`);
-    return SocketServer.singleton as SocketServer<DC, DP>; // TODO this is a hack
+    return SocketServer.singleton;
   }
 
   /**
@@ -405,6 +422,11 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
 
   //////////////////////////////////////////
   // internal methods
+
+  private myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
+    const from_ = [...from, `SocketServer: ${this.name}`];
+    return await this.cortex.myelinate(from_);
+  };
 
   /**
    *
@@ -1522,11 +1544,15 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
       newAddressSet.has(this.contract.nexus.address.bech32),
       `${this.name}.setUserAddressSubscription: not subscribing to nexus`,
     );
+    let i = 0;
     for (const newAddress of newAddressSet) {
       if (!oldAddresses.has(newAddress)) {
         this.utxoSource.subscribeToAddressMsgs(
           this,
-          Bech32Address.fromBech32(newAddress),
+          Bech32Address.fromBech32(
+            `user ${userIpPort.ip}:${userIpPort.port} subscription ${i}`,
+            newAddress,
+          ),
           user,
           notifyUser,
         );
@@ -1537,7 +1563,7 @@ export class SocketServer<DC extends PDappConfigT, DP extends PDappParamsT> {
       if (!newAddressSet.has(oldAddress)) {
         this.utxoSource.unsubscribeFromAddressMsgs(
           this,
-          Bech32Address.fromBech32(oldAddress),
+          Bech32Address.fromBech32(`unsubscribing`, oldAddress),
           user,
         );
       }

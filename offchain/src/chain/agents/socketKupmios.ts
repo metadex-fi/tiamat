@@ -539,53 +539,53 @@ export class SocketKupmios implements ChainInterface {
     for (const [address, currentUtxos] of this.kupoUtxos) {
       // this.log(`queryAddressUtxos: ${address}`);
       promises.push(
-        this.getUnspentOutputs(Bech32Address.fromBech32(address)).then(
-          async (kupoUtxos: UtxoSet) => {
-            // this.log(`coreUtxos: ${coreUtxos.length} at ${address}`);
-            const diff = utxoDiff(currentUtxos, kupoUtxos);
+        this.getUnspentOutputs(
+          Bech32Address.fromBech32(`${this.name}.queryAddressUtxos`, address),
+        ).then(async (kupoUtxos: UtxoSet) => {
+          // this.log(`coreUtxos: ${coreUtxos.length} at ${address}`);
+          const diff = utxoDiff(currentUtxos, kupoUtxos);
 
-            const catchUpCallbacks = this.catchUpCallbacks.get(address);
-            if (catchUpCallbacks) {
-              const catchingUp = utxosCatchingUp(kupoUtxos, diff.created);
-              // const utxos = await this.provider.kupmiosUtxosToUtxos(catchingUp);
+          const catchUpCallbacks = this.catchUpCallbacks.get(address);
+          if (catchUpCallbacks) {
+            const catchingUp = utxosCatchingUp(kupoUtxos, diff.created);
+            // const utxos = await this.provider.kupmiosUtxosToUtxos(catchingUp);
 
-              const events_ = new UtxoEvents(
-                catchingUp.list.map((utxo) => ({
-                  utxo: utxo.core,
-                  type: "create",
-                })),
-                Date.now(),
-                `${this.name}.queryAddressUtxos.catchUpCallbacks`,
-              );
-              catchUpCallbacks.forEach((cb) =>
-                cb.run(
-                  events_,
-                  `${this.name}.queryAddressUtxos`,
-                  Trace.source(
-                    `CHAIN`,
-                    `${this.name}.queryAddressUtxos.catchUpCallbacks`,
-                  ),
+            const events_ = new UtxoEvents(
+              catchingUp.list.map((utxo) => ({
+                utxo: utxo.core,
+                type: "create",
+              })),
+              Date.now(),
+              `${this.name}.queryAddressUtxos.catchUpCallbacks`,
+            );
+            catchUpCallbacks.forEach((cb) =>
+              cb.run(
+                events_,
+                `${this.name}.queryAddressUtxos`,
+                Trace.source(
+                  `CHAIN`,
+                  `${this.name}.queryAddressUtxos.catchUpCallbacks`,
                 ),
-              );
-              this.catchUpCallbacks.delete(address);
-            }
+              ),
+            );
+            this.catchUpCallbacks.delete(address);
+          }
 
-            if (diff.created.size || diff.destroyed.size) {
-              this.kupoUtxos.set(address, kupoUtxos);
-              // const [created, destroyed] = await Promise.all([
-              //   this.provider.kupmiosUtxosToUtxos(diff.created),
-              //   this.provider.kupmiosUtxosToUtxos(diff.destroyed),
-              // ]);
+          if (diff.created.size || diff.destroyed.size) {
+            this.kupoUtxos.set(address, kupoUtxos);
+            // const [created, destroyed] = await Promise.all([
+            //   this.provider.kupmiosUtxosToUtxos(diff.created),
+            //   this.provider.kupmiosUtxosToUtxos(diff.destroyed),
+            // ]);
 
-              this.log(
-                `queryAddressUtxos: ${diff.created.size} created, ${diff.destroyed.size} destroyed at ${address.slice(
-                  -4,
-                )}`,
-              );
-              events.events.push(...this.updateLedger(diff, false));
-            }
-          },
-        ),
+            this.log(
+              `queryAddressUtxos: ${diff.created.size} created, ${diff.destroyed.size} destroyed at ${address.slice(
+                -4,
+              )}`,
+            );
+            events.events.push(...this.updateLedger(diff, false));
+          }
+        }),
       );
     }
 

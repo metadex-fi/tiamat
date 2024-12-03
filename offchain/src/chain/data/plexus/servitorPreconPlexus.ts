@@ -9,6 +9,8 @@ import { Plexus } from "../plexus";
 import { WalletFundsPlexus } from "./walletFundsPlexus";
 import { PDappConfigT, PDappParamsT } from "../../../types/tiamat/tiamat";
 import { WalletFunds } from "../zygote";
+import { Sent } from "../../state/utxoSource";
+import { TiamatContract } from "../../state/tiamatContract";
 
 export type WalletsFundsGanglion = Ganglion<WalletFunds[], WalletsFundsStatus>;
 
@@ -18,12 +20,13 @@ export type WalletsFundsGanglion = Ganglion<WalletFunds[], WalletsFundsStatus>;
 export class ServitorPreconPlexus<
   DC extends PDappConfigT,
   DP extends PDappParamsT,
+  CT extends TiamatContract<DC, DP>,
 > extends Plexus {
   private readonly walletsFundsGanglion: WalletsFundsGanglion;
   public readonly servitorPrecon: ServitorPrecon<DC, DP>;
 
   constructor(
-    user: TiamatUser<DC, DP>,
+    user: TiamatUser<DC, DP, CT>,
     numTxFees: bigint,
     private readonly servitorFundsPlexus: WalletFundsPlexus<DC, DP>,
     private readonly ownerFundsPlexus: WalletFundsPlexus<DC, DP>,
@@ -77,8 +80,8 @@ export class ServitorPreconPlexus<
     );
   }
 
-  public myelinate = (from: string[]): void => {
+  public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
     const from_ = [...from, `ServitorPreconPlexus`];
-    this.walletsFundsGanglion.myelinate(from_);
+    return await this.walletsFundsGanglion.myelinate(from_);
   };
 }
