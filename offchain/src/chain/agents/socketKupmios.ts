@@ -621,7 +621,8 @@ export class SocketKupmios implements ChainInterface {
       for (const [sub, _] of this.utxoSubscribers) {
         promises_.push(sub.notifyUtxoEvents(this, events, trace));
       }
-      result.push(...(await Promise.all(promises_)).flat());
+      const result_ = await Promise.all(promises_);
+      result.push(...result_);
     }
 
     // if (this.queryLoopActive) {

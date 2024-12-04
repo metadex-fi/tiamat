@@ -76,11 +76,15 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
    * @param afferent
    * @param zygote
    */
-  public induce = (trace: Trace) => {
+  public induce = async (trace: Trace): Promise<Result> => {
     assert(this.myelinated, `${this.name}.induce: Ganglion not myelinated`);
     // this.abortController?.abort(); // TODO FIXME
     this.abortController = new AbortController();
+    // NOTE not awaiting this.process on purpose, so we can move on
     this.process(this.abortController.signal, trace.via(`${this.name}.induce`));
+    return await Promise.resolve(
+      new Result([`Induced`], this.name, `induce`, trace),
+    );
   };
 
   /**
@@ -196,7 +200,10 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
    * Propagate data updates downstream.
    * @param data
    */
-  protected induceEfferents = async (data: OutZT, trace: Trace) => {
+  protected induceEfferents = async (
+    data: OutZT,
+    trace: Trace,
+  ): Promise<void> => {
     this.log(
       `Inducing efferents:\n`,
       this.efferents.map((e) => e.name),
@@ -213,7 +220,8 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
         effector.induce(data, this.name, trace_),
       ),
     ];
-    await Promise.all(inductionPromises);
+    const result = await Promise.all(inductionPromises);
+    result.forEach((r) => r.burn().forEach((msg) => this.log(msg)));
   };
 
   /**
