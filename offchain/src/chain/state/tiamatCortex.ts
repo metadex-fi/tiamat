@@ -6,8 +6,8 @@ import {
   NexusPlexus,
 } from "../data/plexus/electionsPlexus";
 import { SvmSingletonPlexus } from "../data/plexus/svmSingletonPlexus";
+import { Result } from "./callback";
 import { TiamatContract } from "./tiamatContract";
-import { Sent } from "./utxoSource";
 
 export class TiamatCortex<
   DC extends PDappConfigT,
@@ -34,7 +34,7 @@ export class TiamatCortex<
     );
   }
 
-  public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
+  public myelinate = async (from: string[]): Promise<Result[]> => {
     const from_ = [...from, `TiamatCortex: ${this.name}`];
     const result = await Promise.all([
       this.matrixPlexus.myelinate(from_),

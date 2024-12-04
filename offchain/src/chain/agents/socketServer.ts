@@ -24,7 +24,7 @@ import { MatrixUtxo, TiamatSvmUtxo } from "../state/tiamatSvmUtxo";
 import { SocketKupmios } from "./socketKupmios";
 import { SocketPraetor, UserSockets, VectorSockets } from "./socketPraetor";
 import { SubscriptionPraetor } from "./subscriptionPraetor";
-import { Callback } from "../state/callback";
+import { Callback, Result } from "../state/callback";
 import {
   Bech32Address,
   P,
@@ -67,6 +67,7 @@ import {
 import { getEd25519KeyHashHex } from "../../utils/conversions";
 import { Effector } from "../data/effector";
 import { TiamatCortex } from "../state/tiamatCortex";
+import { trace } from "console";
 
 /**
  *
@@ -259,7 +260,7 @@ export class SocketServer<
                 `${this.name} - effector for syncEigenValue: matrix = ${maybeMatrix}`,
               ]);
             } else {
-              return await this.syncEigenValue(maybeMatrix, trace);
+              return [await this.syncEigenValue(maybeMatrix, trace)];
             }
           },
         ),
@@ -424,7 +425,7 @@ export class SocketServer<
   //////////////////////////////////////////
   // internal methods
 
-  private myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
+  private myelinate = async (from: string[]): Promise<Result[]> => {
     const from_ = [...from, `SocketServer: ${this.name}`];
     return await this.cortex.myelinate(from_);
   };
@@ -532,15 +533,8 @@ export class SocketServer<
           typeof event.data === `string`,
           `${this.name}.receiveMessage: expected string`,
         );
-        const result: (string | Sent)[] = await receiveMessage(
-          ws,
-          event.data,
-          ipPort,
-        );
-        result.forEach((r) => {
-          if (typeof r === "string") this.log(`RESULT`, r);
-          else this.log(`RESULT SENT:`, r.txId.txId);
-        });
+        const result: Result = await receiveMessage(ws, event.data, ipPort);
+        result.burn().forEach((r) => this.log(r));
       };
     };
 
@@ -822,7 +816,7 @@ export class SocketServer<
 
   private maybeAcceptConnections = async (
     election: ElectionData<DC, DP>,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     const firstOwnIndex = election.eligibleEVs.findIndex(
       (ev) => ev.vector.toBlaze() === this.ownPublicKeyHash,
     );
@@ -846,13 +840,16 @@ export class SocketServer<
       }
     }
     this.log(msg);
-    return [msg];
+    return new Result(
+      [msg],
+      Trace.source(`SOCKET`, `${this.name}.maybeAcceptConnections`),
+    );
   };
 
   private updateElectionConnections = async (
     election: ElectionData<DC, DP>,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.tip = election.tiamatParams.suggested_tip;
     const firstOwnIndex = election.eligibleEVs.findIndex(
       (ev) => ev.vector.toBlaze() === this.ownPublicKeyHash,
@@ -866,7 +863,10 @@ export class SocketServer<
         !deleted,
         `${this.name}.updateElectionConnections: deleted self from eligibleEVsValencies`,
       );
-      return [`${this.name}.updateElectionConnections: not eligible`];
+      return new Result(
+        [`${this.name}.updateElectionConnections: not eligible`],
+        trace,
+      );
     } else {
       assert(
         deleted,
@@ -894,7 +894,10 @@ export class SocketServer<
       trace,
     );
 
-    return [`${this.name}.updateElectionConnections: connections updated`];
+    return new Result(
+      [`${this.name}.updateElectionConnections: connections updated`],
+      trace,
+    );
   };
 
   /**
@@ -1266,7 +1269,7 @@ export class SocketServer<
     _ws: WebSocket,
     data: string,
     userIpPort: IpPort,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     // TODO catch and handle errors
     const msg = JSON.parse(data);
     this.log(`received message from user ${userIpPort.ip}:${userIpPort.port}`);
@@ -1295,7 +1298,7 @@ export class SocketServer<
       );
     }
 
-    let result: (string | Sent)[];
+    let result: Result;
     // if (msg.tag === `subscribeToNewBlock`) {
     //   result = this.setUserBlockSubscription(userIpPort);
     // } else
@@ -1304,10 +1307,16 @@ export class SocketServer<
         msg.payload instanceof Array,
         `${this.name}: wrong data type for ${msg.tag}`,
       );
-      result = [
-        ...this.updateUserBlockSubscription(userIpPort),
-        ...(await this.updateUserAddressSubscriptions(userIpPort, msg.payload)),
-      ];
+      result = new Result(
+        [
+          ...this.updateUserBlockSubscription(userIpPort),
+          ...(await this.updateUserAddressSubscriptions(
+            userIpPort,
+            msg.payload,
+          )),
+        ],
+        Trace.source(`SOCKET`, `${this.name}.receiveUserMessage`),
+      );
     } else if (msg.tag === `untipped tx`) {
       assert(
         typeof msg.payload === `string`,
@@ -1348,7 +1357,10 @@ export class SocketServer<
     } else {
       const error = `unknown tag: ${msg.tag}`;
       this.throw(error);
-      result = [error];
+      result = new Result(
+        [error],
+        Trace.source(`SOCKET`, `${this.name}.receiveUserMessage`),
+      );
     }
     return result;
   };
@@ -1363,7 +1375,7 @@ export class SocketServer<
     _ws: WebSocket,
     data: string,
     vectorIpPort: IpPort,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     // TODO catch and handle errors
     const msg = JSON.parse(data);
 
@@ -1394,7 +1406,7 @@ export class SocketServer<
       `${this.name}: unknown vector ip/port: ${vectorIpPort.ip}:${vectorIpPort.port}`,
     );
     this.vectorPeerSockets.discharge(id);
-    let result: (string | Sent)[];
+    let result: Result;
     if (msg.tag === `untipped tx`) {
       // we use this to inform each other about submissions of tipped
       // txes, such that our local utxo-state remains synced
@@ -1418,7 +1430,10 @@ export class SocketServer<
     } else {
       const error = `unknown tag: ${msg.tag}`;
       this.throw(error);
-      result = [error];
+      result = new Result(
+        [error],
+        Trace.source(`SOCKET`, `${this.name}.receiveVectorMessage`),
+      );
     }
     return result;
   };
@@ -1584,7 +1599,7 @@ export class SocketServer<
     txCBOR: Core.TxCBOR,
     // ws: WebSocket,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.log(`processUntippedTx`);
     // TODO catch and handle errors
     const tx = Core.Transaction.fromCbor(txCBOR);
@@ -1610,14 +1625,14 @@ export class SocketServer<
   private recordTippedTx = async (
     tx: Core.Transaction,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     // TODO catch and handle errors
     const txId = tx.toCore().id;
     if (this.recordedTxs.has(txId)) {
       if (this.recordedTxs.size > recordedTxCacheSize) {
         this.recordedTxs.clear();
       }
-      return [`tx already recorded`];
+      return new Result([`tx already recorded`], trace);
     } else {
       this.recordedTxs.add(txId);
       const utxosID = await this.socketKupmios.latchUtxoSemaphore(
@@ -1666,18 +1681,18 @@ export class SocketServer<
   private processTippedTx = async (
     tx: TippedTxCBOR,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     /**
      *
      * @param msg
      */
-    const fail = (msg: string): string[] => {
+    const fail = (msg: string): Result => {
       if (handleInvalidVectorMsgs) {
         this.log(msg);
       } else {
         this.throw(msg);
       }
-      return [msg];
+      return new Result([msg], trace);
     };
 
     // parse tx
@@ -1727,7 +1742,7 @@ export class SocketServer<
     // -> if so, we submit it and return
     // -> otherwise, we send the updated tx to all the missing clique-members
 
-    let result: (string | Sent)[];
+    let result: Result;
     if (txClique.outstanding.length === 0) {
       this.processedTxesIn.add(txID);
       const signedPayloadTx = new Core.Transaction(
@@ -1735,18 +1750,21 @@ export class SocketServer<
         newWitnessSet,
         parsedTx.partiallySignedPayloadTx.auxiliaryData(),
       );
-      result = [
-        ...(await this.submitTxToChain(
-          signedPayloadTx,
-          true,
-          trace.via(`${this.name}.processTippedTx (1/2)`),
-        )),
-        ...(await this.submitTxToChain(
-          parsedTx.signedTippingTx,
-          false,
-          trace.via(`${this.name}.processTippedTx (2/2)`),
-        )),
-      ];
+      result = new Result(
+        [
+          await this.submitTxToChain(
+            signedPayloadTx,
+            true,
+            trace.via(`${this.name}.processTippedTx (1/2)`),
+          ),
+          await this.submitTxToChain(
+            parsedTx.signedTippingTx,
+            false,
+            trace.via(`${this.name}.processTippedTx (2/2)`),
+          ),
+        ],
+        trace,
+      );
     } else {
       this.log(`sending tipped tx to peers`);
       const updatedTx: TippedTxCBOR = {
@@ -1774,7 +1792,7 @@ export class SocketServer<
         ws.send(msg_);
       });
       this.vectorPeerSockets.discharge(id);
-      result = [`sent tipped tx to peers`];
+      result = new Result([`sent tipped tx to peers`], trace);
     }
     return result;
   };
@@ -1787,19 +1805,19 @@ export class SocketServer<
   private processElectionTx = async (
     tx: ElectionTxCBOR,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.log(`processElectionTx`);
     /**
      *
      * @param msg
      */
-    const fail = (msg: string): string[] => {
+    const fail = (msg: string): Result => {
       if (handleInvalidVectorMsgs) {
         this.log(msg);
       } else {
         this.throw(msg);
       }
-      return [msg];
+      return new Result([msg], trace);
     };
     // parse tx
     const parsedTx = parseElectionTx(tx);
@@ -1847,7 +1865,7 @@ export class SocketServer<
     // -> if so, we submit it and return
     // -> otherwise, we send the updated tx to all the missing clique-members
 
-    let result: (string | Sent)[];
+    let result: Result;
     if (txClique.outstanding.length === 0) {
       this.log(`submitting election-tx`);
       this.processedTxesIn.add(txID);
@@ -1886,7 +1904,7 @@ export class SocketServer<
         ws.send(msg_);
       });
       this.vectorPeerSockets.discharge(id);
-      result = [`sent election-tx to peers`];
+      result = new Result([`sent election-tx to peers`], trace);
     }
 
     return result;
@@ -1902,10 +1920,10 @@ export class SocketServer<
     tx: Core.Transaction, // common denominator of TxSigned (our own) and Core.TxCBOR (from the wire)
     updateLocalOutputs: boolean, // for tipping-tx we got ambiguity, so we don't create utxos here
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.log(`submitting via socketServer`);
 
-    const result: (string | Sent)[] = [];
+    const result: (Result | string | Sent)[] = [];
     this.recordedTxs.add(tx.toCore().id);
 
     const utxosID = await this.socketKupmios.latchUtxoSemaphore(
@@ -1913,21 +1931,21 @@ export class SocketServer<
     );
 
     result.push(
-      ...(await this.socketKupmios.submitUntippedTx(
+      await this.socketKupmios.submitUntippedTx(
         tx,
         trace.via(`${this.name}.submitTxToChain`),
-      )),
+      ),
     );
     await this.informOtherVectorsAboutTx(tx);
     result.push(
-      ...(await this.socketKupmios.applyTxToLedger(
+      await this.socketKupmios.applyTxToLedger(
         tx,
         updateLocalOutputs,
         trace.via(`${this.name}.submitTxToChain.socketKupmios.applyTxToLedger`),
-      )),
+      ),
     );
     this.socketKupmios.dischargeUtxoSemaphore(utxosID);
-    return result;
+    return new Result(result, trace);
   };
 
   /**
@@ -1957,7 +1975,8 @@ export class SocketServer<
   private syncEigenValue = async (
     matrix: MatrixUtxo,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
+    this.log(`syncEigenValue`);
     assert(matrix.svmDatum, `${this.name}: no svmDatum in matrix utxo`);
     const eigenValues = matrix.svmDatum.state.eigen_values;
     const eigenwert = matrix.svmDatum.config.eigenwert;
@@ -1970,12 +1989,12 @@ export class SocketServer<
       nexusUtxo = this.contract.nexus.singleton.utxo;
     } catch (err) {
       this.log(err as string);
-      return [`syncEigenValue: nexus not found`];
+      return new Result([`syncEigenValue: nexus not found`], trace);
     }
 
     const utxos = await UtxoSet.ofWallet(this.blaze.wallet);
     if (utxos.size === 0) {
-      return [`no utxos`];
+      return new Result([`no utxos`], trace);
     }
 
     const ownEigenValue = eigenValues.find(
@@ -2014,7 +2033,10 @@ export class SocketServer<
           nexusUtxo,
         );
       } else {
-        return [`not registered and no desire to be registered`];
+        return new Result(
+          [`not registered and no desire to be registered`],
+          trace,
+        );
       }
     } else if (this.targetStake === 0n) {
       const vector = KeyHash.fromBlaze(this.ownPublicKeyHash);
@@ -2087,7 +2109,7 @@ export class SocketServer<
       }
     }
 
-    let return_: (string | Sent)[] = [`already synced`];
+    let return_: (Result | string | Sent)[] = [`already synced`];
     if (tx) {
       this.log(`about to submit syncing tx...`);
 
@@ -2099,16 +2121,16 @@ export class SocketServer<
         this.log(`signed`);
         // try {
         return_ = [
-          ...(await this.contract.submitUntippedTx(
+          await this.contract.submitUntippedTx(
             signedTxes[0],
             // mkAckCallback(0, 2),
             trace.via(`${this.name}.syncEigenValue (1/2)`),
-          )),
-          ...(await this.contract.submitUntippedTx(
+          ),
+          await this.contract.submitUntippedTx(
             signedTxes[1],
             // mkAckCallback(1, 2),
             trace.via(`${this.name}.syncEigenValue (2/2)`),
-          )),
+          ),
         ];
         // } catch (e) {
         //   return [`syncing txes failed - ${e}`];
@@ -2121,11 +2143,13 @@ export class SocketServer<
         const txSigned = await txCompleat.sign();
         this.log(`signed`);
         // try {
-        return_ = await this.contract.submitUntippedTx(
-          txSigned,
-          // mkAckCallback(0, 1),
-          trace.via(`${this.name}.syncEigenValue`),
-        );
+        return_ = [
+          await this.contract.submitUntippedTx(
+            txSigned,
+            // mkAckCallback(0, 1),
+            trace.via(`${this.name}.syncEigenValue`),
+          ),
+        ];
         // } catch (e) {
         //   return [`syncing tx failed - ${e}`];
         // }
@@ -2134,7 +2158,7 @@ export class SocketServer<
       // await redLight;
     }
 
-    return return_;
+    return new Result(return_, trace);
   };
 
   /**

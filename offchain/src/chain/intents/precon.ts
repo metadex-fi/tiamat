@@ -7,10 +7,9 @@ import {
   TxId,
   UtxoSet,
 } from "../../utils/wrappers";
-import { Sent } from "../state/utxoSource";
 import assert from "assert";
 import { TiamatContract } from "../state/tiamatContract";
-import { Callback } from "../state/callback";
+import { Callback, Result } from "../state/callback";
 import { Ganglion } from "../data/ganglion";
 import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
 import { Zygote } from "../data/zygote";
@@ -34,7 +33,7 @@ export interface FixFoldPhase<
     trace: Trace,
   ) => Promise<{
     fixTxCompleat: TxCompleat; // for chaining the action-tx
-    submitFixTx: () => Promise<(string | Sent)[]>;
+    submitFixTx: () => Promise<Result>;
   }>; // if we need a non-standard tx submit function, i.e. for elections. Right now only a single one per fixing-tx supported.
 }
 
@@ -72,7 +71,7 @@ export abstract class Precon<
       trace: Trace,
     ) => Promise<{
       fixTxCompleat: TxCompleat; // for chaining the action-tx
-      submitFixTx: () => Promise<(string | Sent)[]>;
+      submitFixTx: () => Promise<Result>;
     }>, // if we need a non-standard tx submit function, i.e. for elections. Right now only a single one per fixing-tx supported.
   ) {}
 

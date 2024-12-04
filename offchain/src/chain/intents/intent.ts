@@ -14,8 +14,7 @@ import {
 import { TiamatUser } from "../agents/tiamatUser";
 import { Core } from "@blaze-cardano/sdk";
 import { FixFoldPhase, Precon } from "./precon";
-import { Sent } from "../state/utxoSource";
-import { Callback } from "../state/callback";
+import { Callback, Result } from "../state/callback";
 import { errorTimeoutMs } from "../../utils/constants";
 import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
 import { TiamatContract } from "../state/tiamatContract";
@@ -59,7 +58,7 @@ export abstract class Intent<
       setAckTxId: (txId: TxId) => void, // for the ack-callback
       conflux: Conflux<ChoicesT, StatusT>,
       trace: Trace,
-    ) => Promise<(string | Sent)[]>, // construct action-tx, add tips (if applicable), compleat, sign, submit, etc.
+    ) => Promise<Result>, // construct action-tx, add tips (if applicable), compleat, sign, submit, etc.
   ) {
     this.name = `${user.name} Intent`;
     this.conflux = this.mkConflux(mkDefaultChoices(), defaultStatus);
@@ -85,7 +84,7 @@ export abstract class Intent<
     this.updateDisplay(this.conflux, this.status);
   };
 
-  public execute = async (): Promise<(string | Sent)[]> => {
+  public execute = async (): Promise<Result> => {
     assert(
       this.status === `choosing`,
       `${this.name}.execute: status ${this.status} !== choosing`,
@@ -93,7 +92,7 @@ export abstract class Intent<
     return await this.execute_();
   };
 
-  private execute_ = async (): Promise<(string | Sent)[]> => {
+  private execute_ = async (): Promise<Result> => {
     assert(
       this.conflux.state === `valid`,
       `${this.name}.execute_: state ${this.conflux.state} !== valid`,
@@ -130,8 +129,8 @@ export abstract class Intent<
         throw new Error(`Unexpected fixWallet: ${fix.fixWallet}`);
     }
 
-    const result: (string | Sent)[] = [];
-    const trace = Trace.source(`SUB`, this.name);
+    const result: Result[] = [];
+    // const trace = Trace.source(`SUB`, this.name);
 
     // TODO some sort of timeout
     let expectedTxId: TxId | null = null;
@@ -145,10 +144,10 @@ export abstract class Intent<
     };
     const actionAckCallbackFn = async (
       txId: TxId,
-      _trace: Trace,
-    ): Promise<(string | Sent)[]> => {
+      trace: Trace,
+    ): Promise<[Result]> => {
       this.log(`actionAckCallbackFn: received ACK:\n <~~`, txId.txId);
-      const result: (string | Sent)[] = [`ACK: ${txId.txId}`];
+      const result = new Result([`ACK: ${txId.txId}`], trace);
       assert(
         expectedTxId,
         `${this.name}.actionAckCallbackFn: expectedTxId not set`,
@@ -159,7 +158,7 @@ export abstract class Intent<
         this.status = `failure`; // TODO retry
       }
       this.updateDisplay(this.conflux, this.status);
-      return await Promise.resolve(result);
+      return await Promise.resolve([result]);
     };
     const actionAckCallback: Callback<TxId> = new Callback<TxId>(
       `once`,
@@ -167,6 +166,7 @@ export abstract class Intent<
       actionAckCallbackFn,
     );
 
+    const trace = Trace.source(`SUB`, `${this.name}.execute_`);
     if (fixTx) {
       if (fix.divergentFixSubmit) {
         const { fixTxCompleat, submitFixTx } = await fix.divergentFixSubmit(
@@ -178,16 +178,16 @@ export abstract class Intent<
           this.user.getBlaze(this.actionWallet),
           fix.utxoChainers,
         );
-        result.push(...(await submitFixTx()));
+        result.push(await submitFixTx());
         result.push(
-          ...(await this.sendActionTx(
+          await this.sendActionTx(
             fixTxCompleat,
             actionBaseTx,
             actionAckCallback,
             setAckTxId,
             this.conflux,
             trace,
-          )),
+          ),
         );
       } else {
         // default fix tx submit
@@ -198,33 +198,33 @@ export abstract class Intent<
         );
         const fixTxSigned = await fixTxCompleat.sign();
         result.push(
-          ...(await this.user.contract.submitUntippedTx(fixTxSigned, trace)),
+          await this.user.contract.submitUntippedTx(fixTxSigned, trace),
         );
         result.push(
-          ...(await this.sendActionTx(
+          await this.sendActionTx(
             fixTxCompleat,
             actionBaseTx,
             actionAckCallback,
             setAckTxId,
             this.conflux,
             trace,
-          )),
+          ),
         );
       }
     } else {
       const actionBaseTx = await this.user.newTx(this.actionWallet);
       result.push(
-        ...(await this.sendActionTx(
+        await this.sendActionTx(
           null,
           actionBaseTx,
           actionAckCallback,
           setAckTxId,
           this.conflux,
           trace,
-        )),
+        ),
       );
     }
-    return result;
+    return new Result(result, trace);
   };
 
   public cancel = async (): Promise<void> => {
@@ -250,7 +250,7 @@ export abstract class Intent<
     this.updateDisplay(this.conflux, this.status);
   };
 
-  public retry = async (): Promise<(string | Sent)[]> => {
+  public retry = async (): Promise<Result> => {
     assert(
       this.status === `failure`,
       `${this.name}.retry: status ${this.status} !== failure`,

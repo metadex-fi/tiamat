@@ -1,6 +1,6 @@
 import assert from "assert";
 import { errorTimeoutMs } from "../../utils/constants";
-import { Sent } from "../state/utxoSource";
+import { Result } from "../state/callback";
 
 /**
  * Ganglia often interconnect with other ganglia to form a complex system of ganglia known as a plexus.
@@ -13,7 +13,7 @@ export abstract class Plexus {
     );
   }
 
-  abstract myelinate(from: string[]): Promise<(string | Sent)[]>;
+  abstract myelinate(from: string[]): Promise<Result[]>;
 
   /**
    *

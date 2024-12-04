@@ -9,8 +9,8 @@ import { Plexus } from "../plexus";
 import { WalletFundsPlexus } from "./walletFundsPlexus";
 import { PDappConfigT, PDappParamsT } from "../../../types/tiamat/tiamat";
 import { WalletFunds } from "../zygote";
-import { Sent } from "../../state/utxoSource";
 import { TiamatContract } from "../../state/tiamatContract";
+import { Result } from "../../state/callback";
 
 export type WalletsFundsGanglion = Ganglion<WalletFunds[], WalletsFundsStatus>;
 
@@ -80,7 +80,7 @@ export class ServitorPreconPlexus<
     );
   }
 
-  public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
+  public myelinate = async (from: string[]): Promise<Result[]> => {
     const from_ = [...from, `ServitorPreconPlexus`];
     return await this.walletsFundsGanglion.myelinate(from_);
   };

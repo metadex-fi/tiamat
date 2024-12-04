@@ -1,7 +1,7 @@
 import assert from "assert";
 import { Simplephore } from "../agents/semaphore";
 import { Sent, UtxoEvent, UtxoEvents, UtxoSource } from "./utxoSource";
-import { Callback } from "./callback";
+import { Callback, Result } from "./callback";
 import { Bech32Address, Trace, Tx, UtxoSet } from "../../utils/wrappers";
 import {
   Blaze,
@@ -74,7 +74,7 @@ export class Wallet {
             nextEvents = this.eventQueue.splice(0);
           }
           this.eventsSemaphore.discharge(eventsID);
-          const result = await this.processCallbacks(
+          const result: (Result | string)[] = await this.processCallbacks(
             trace.calledFrom(this.name, `constructor`),
           );
           result.push(
@@ -99,7 +99,7 @@ export class Wallet {
   public innervateUtxosStem = async (
     stem: WalletUtxosStem,
     callback: Callback<UtxoSet>,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.log(`subscribing to utxo set:`, callback.show());
     assert(
       stem instanceof WalletUtxosStem,
@@ -121,7 +121,7 @@ export class Wallet {
   public innervateFundsStem = async (
     stem: WalletFundsStem,
     callback: Callback<Map<Core.AssetId, bigint>>,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.log(`subscribing to funds:`, callback.show());
     assert(
       stem instanceof WalletFundsStem,
@@ -258,11 +258,13 @@ export class Wallet {
         callback.perform,
         [this.name, `subscribeToAddress`, concise],
         async (walletUtxos, trace) => {
-          return await callback.run(
-            walletUtxos,
-            `${this.name}.subscribeToAddress(${concise})`,
-            trace,
-          );
+          return [
+            await callback.run(
+              walletUtxos,
+              `${this.name}.subscribeToAddress(${concise})`,
+              trace,
+            ),
+          ];
         },
       ),
     );
@@ -349,9 +351,7 @@ export class Wallet {
     }
   };
 
-  private processCallbacks = async (
-    trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  private processCallbacks = async (trace: Trace): Promise<Result[]> => {
     return (
       await Promise.all([
         this.processUtxoSetCallbacks(trace),
@@ -360,9 +360,7 @@ export class Wallet {
     ).flat();
   };
 
-  private processUtxoSetCallbacks = async (
-    trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  private processUtxoSetCallbacks = async (trace: Trace): Promise<Result[]> => {
     this.log(`processing ${this.utxoSetCallbacks.length} utxoSetCallbacks`);
     const callbacks_: Callback<UtxoSet>[] = [];
     const result = (
@@ -384,9 +382,7 @@ export class Wallet {
     return result;
   };
 
-  private processFundsCallbacks = async (
-    trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  private processFundsCallbacks = async (trace: Trace): Promise<Result[]> => {
     this.log(`processing ${this.fundsCallbacks.length} fundsCallbacks`);
     const callbacks_: Callback<Map<Core.AssetId, bigint>>[] = [];
     const result = (

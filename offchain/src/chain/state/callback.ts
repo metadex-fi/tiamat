@@ -5,9 +5,46 @@ import {
   errorTimeoutMs,
   logCallbackFns,
   logCallbacks,
+  resultPrintTimeoutMs,
 } from "../../utils/constants";
 import { Sent } from "./utxoSource";
 import { Trace } from "../../utils/wrappers";
+import { ErrorTimeout } from "../../utils/errorTimeout";
+
+export class Result {
+  readonly __brand = `Result`;
+  private burned = false;
+  private timeout?: ErrorTimeout;
+  constructor(
+    private readonly messages: (Result | string | Sent)[],
+    trace: Trace,
+  ) {
+    if (resultPrintTimeoutMs !== null) {
+      this.timeout = new ErrorTimeout(
+        `Result`,
+        `PrintTimeout`,
+        resultPrintTimeoutMs,
+        trace,
+      );
+    }
+  }
+
+  public burn = (): string[] => {
+    this.timeout?.clear();
+    this.timeout = undefined;
+    assert(!this.burned, `Result already burned`);
+    this.burned = true;
+    return this.messages
+      .map((msg) =>
+        msg instanceof Result
+          ? msg.burn()
+          : msg instanceof Sent
+            ? [`RESULT SENT: ${msg.txId.txId}`]
+            : [`RESULT: ${msg}`],
+      )
+      .flat();
+  };
+}
 
 /**
  *
@@ -16,11 +53,7 @@ export class Callback<T> {
   public readonly fullName: string;
   private readonly shortName: string; // use fullName
   static count = 0;
-  public readonly run: (
-    data: T,
-    from: string,
-    trace: Trace,
-  ) => Promise<(string | Sent)[]>;
+  public readonly run: (data: T, from: string, trace: Trace) => Promise<Result>;
   // public readonly name: string;
   /**
    *
@@ -31,7 +64,7 @@ export class Callback<T> {
   constructor(
     public readonly perform: `once` | `always`,
     id: (string | undefined)[],
-    callback: (data: T, trace: Trace) => Promise<(string | Sent)[]>,
+    callback: (data: T, trace: Trace) => Promise<(Result | string | Sent)[]>,
   ) {
     const count = Callback.count++;
     const id_ = id.filter((id) => id !== undefined);
@@ -62,7 +95,7 @@ export class Callback<T> {
         );
       }
 
-      let result: (string | Sent)[];
+      let result: (Result | string | Sent)[];
       if (callbackTimeoutMs) {
         const errorTimeout = setTimeout(() => {
           const at = new Date().toISOString().split(`T`).at(-1)!.slice(0, -1);
@@ -101,7 +134,11 @@ export class Callback<T> {
       if (logCallbacks) {
         console.log(`${this.fullName} DONE\n`);
       }
-      return result;
+      if (result instanceof Result) {
+        return result;
+      } else {
+        return new Result(result, trace);
+      }
     };
   }
 

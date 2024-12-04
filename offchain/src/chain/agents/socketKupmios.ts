@@ -7,7 +7,7 @@ import {
   UtxoEvents,
   UtxoSource,
 } from "../state/utxoSource";
-import { Callback } from "../state/callback";
+import { Callback, Result } from "../state/callback";
 import { Semaphore } from "./semaphore";
 import { Bech32Address, Trace, TxId, UtxoSet } from "../../utils/wrappers";
 import { CliqueElectionTx, CliqueTippedTx } from "../state/messages";
@@ -176,11 +176,12 @@ export class SocketKupmios implements ChainInterface {
     const getUnspentOutputs = async (
       address: Bech32Address,
     ): Promise<UtxoSet> => {
+      const trace = Trace.source(`INPUT`, `SocketKupmios.getUnspentOutputs`);
       return UtxoSet.fromList(
         (await provider.getUnspentOutputs(address.blaze)).map((core) => {
           return {
             core,
-            trace: Trace.source(`INPUT`, `SocketKupmios.getUnspentOutputs`),
+            trace,
           };
         }),
       );
@@ -331,18 +332,18 @@ export class SocketKupmios implements ChainInterface {
   public submitUntippedTx = async (
     tx: Core.Transaction, // common denominator of TxSigned (our own) and Core.TxCBOR (from the wire)
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.log("submitting to emulator");
     try {
       // const txHex = Core.toHex(tx.to_bytes());
       const txId = await this.provider.postTransactionToChain(tx);
       // await this.provider.awaitTransactionConfirmation(txId); // NOTE waits for a new block (in kupmios as well) which is too slow
       this.log(`submitUntippedTx - submitted ${txId}`);
-      return [`submitted ${txId}`];
+      return new Result([`submitted ${txId}`], trace);
     } catch (err) {
       const msg = `submitUntippedTx: ERROR\n${trace.toString()}\n${err}`;
       this.throw(msg);
-      return [`${this.name}.submitUntippedTx: ERROR`];
+      return new Result([`${this.name}.submitUntippedTx: ERROR`], trace);
     }
   };
 
@@ -354,7 +355,7 @@ export class SocketKupmios implements ChainInterface {
   public submitTippedTxes = (
     _txes: CliqueTippedTx[],
     _trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     // TODO inelegant
     throw new Error(
       `${this.name}.submitTippedTxes: don't submit unfinished txes to chain`,
@@ -369,7 +370,7 @@ export class SocketKupmios implements ChainInterface {
   public submitElectionTxes = (
     _txes: CliqueElectionTx[],
     _trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     // TODO inelegant
     throw new Error(
       `${this.name}.submitElectionTxes: don't submit unfinished txes to chain`,
@@ -386,7 +387,7 @@ export class SocketKupmios implements ChainInterface {
     tx: Core.Transaction, // common denominator of TxSigned (our own) and Core.TxCBOR (from the wire)
     updateOutputs: boolean, // for tipping-tx we got ambiguity, so we don't create utxos here
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     const destroyed = UtxoSet.empty();
     const inputs = tx.body().inputs().values();
     for (const input of inputs) {
@@ -407,14 +408,14 @@ export class SocketKupmios implements ChainInterface {
             new Core.TransactionInput(txId.txId, BigInt(index)),
             output,
           ),
-          Trace.source(`SUB`, `${this.name}.applyTxToLedger`),
+          trace,
         );
       }
     }
 
     const events = this.updateLedger({ created, destroyed }, true);
     if (events.length) {
-      const promises: Promise<(string | Sent)[]>[] = [];
+      const promises: Promise<Result>[] = [];
       const events_ = new UtxoEvents(
         events,
         Date.now(),
@@ -429,9 +430,9 @@ export class SocketKupmios implements ChainInterface {
           ),
         );
       }
-      return (await Promise.all(promises)).flat();
+      return new Result((await Promise.all(promises)).flat(), trace);
     }
-    return [];
+    return new Result([], trace);
   };
 
   /**
@@ -470,16 +471,10 @@ export class SocketKupmios implements ChainInterface {
       // result.forEach((r) => r.forEach((r_) => this.log(r_)));
 
       this.queryNewBlock().then((result) =>
-        result.forEach((r) => {
-          if (typeof r === "string") this.log(`RESULT`, r);
-          else this.log(`RESULT SENT:`, r.txId.txId);
-        }),
+        result.burn().forEach((r) => this.log(r)),
       );
       this.queryAddressUtxos().then((result) =>
-        result.forEach((r) => {
-          if (typeof r === "string") this.log(`RESULT`, r);
-          else this.log(`RESULT SENT:`, r.txId.txId);
-        }),
+        result.burn().forEach((r) => this.log(r)),
       );
 
       await new Promise(
@@ -504,32 +499,27 @@ export class SocketKupmios implements ChainInterface {
   /**
    *
    */
-  private queryNewBlock = async (): Promise<(string | Sent)[]> => {
+  private queryNewBlock = async (): Promise<Result> => {
     const blockHeight = await this.getBlockHeight();
+    const trace = Trace.source(`CHAIN`, `${this.name}.queryNewBlock`);
     if (blockHeight === null) {
-      return ["not connected or synced"];
+      return new Result(["not connected or synced"], trace);
     }
     if (blockHeight !== this.blockHeight) {
       this.blockHeight = blockHeight;
-      const promises: Promise<(string | Sent)[]>[] = [];
+      const promises: Promise<Result>[] = [];
       this.blockSubscribers.forEach((sub) =>
-        promises.push(
-          sub.notifyNewBlock(
-            this,
-            blockHeight,
-            Trace.source(`CHAIN`, `${this.name}.queryNewBlock`),
-          ),
-        ),
+        promises.push(sub.notifyNewBlock(this, blockHeight, trace)),
       );
-      return (await Promise.all(promises)).flat();
+      return new Result((await Promise.all(promises)).flat(), trace);
     }
-    return [];
+    return new Result([], trace);
   };
 
   /**
    *
    */
-  private queryAddressUtxos = async (): Promise<(string | Sent)[]> => {
+  private queryAddressUtxos = async (): Promise<Result> => {
     const promises: Promise<void>[] = [];
     const events = new UtxoEvents(
       [],
@@ -558,15 +548,12 @@ export class SocketKupmios implements ChainInterface {
               Date.now(),
               `${this.name}.queryAddressUtxos.catchUpCallbacks`,
             );
+            const trace = Trace.source(
+              `CHAIN`,
+              `${this.name}.queryAddressUtxos.catchUpCallbacks`,
+            );
             catchUpCallbacks.forEach((cb) =>
-              cb.run(
-                events_,
-                `${this.name}.queryAddressUtxos`,
-                Trace.source(
-                  `CHAIN`,
-                  `${this.name}.queryAddressUtxos.catchUpCallbacks`,
-                ),
-              ),
+              cb.run(events_, `${this.name}.queryAddressUtxos`, trace),
             );
             this.catchUpCallbacks.delete(address);
           }
@@ -594,23 +581,18 @@ export class SocketKupmios implements ChainInterface {
     // );
     await Promise.all(promises);
 
-    let result: (string | Sent)[] = [];
+    let result: Result[] = [];
     if (events.events.length) {
       this.log(
         `queryAddressUtxos: ${events.events.length} events, ${this.utxoSubscribers.size} subscribers`,
       );
-      const promises_: Promise<(string | Sent)[]>[] = [];
+      const promises_: Promise<Result>[] = [];
+      const trace = Trace.source(
+        `CHAIN`,
+        `${this.name}.queryAddressUtxos.notifyUtxoEvents`,
+      );
       for (const [sub, _] of this.utxoSubscribers) {
-        promises_.push(
-          sub.notifyUtxoEvents(
-            this,
-            events,
-            Trace.source(
-              `CHAIN`,
-              `${this.name}.queryAddressUtxos.notifyUtxoEvents`,
-            ),
-          ),
-        );
+        promises_.push(sub.notifyUtxoEvents(this, events, trace));
       }
       result = (await Promise.all(promises_)).flat();
     }
@@ -624,7 +606,10 @@ export class SocketKupmios implements ChainInterface {
     //     queryLoopTimeoutMs,
     //   );
     // }
-    return result;
+    return new Result(
+      result,
+      Trace.source(`CHAIN`, `${this.name}.queryAddressUtxos`),
+    );
   };
 
   // TODO messy as fuck

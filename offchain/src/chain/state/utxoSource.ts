@@ -6,7 +6,7 @@ import {
   errorTimeoutMs,
   handleTxSubmissionErrors,
 } from "../../utils/constants";
-import { Callback } from "./callback";
+import { Callback, Result } from "./callback";
 import { f } from "../../types/general/fundamental/type";
 import {
   Bech32Address,
@@ -80,6 +80,7 @@ export class UtxoEvents {
  *
  */
 export class Sent {
+  readonly __brand = `Sent`;
   /**
    *
    * @param txId
@@ -109,18 +110,12 @@ export interface ChainInterface {
   ) => void;
   subscribeToNewBlock: (subscriber: UtxoSource) => void;
   // subscribeToAck: (subscriber: UtxoSource) => void;
-  submitUntippedTx: (
-    tx: Core.Transaction,
-    trace: Trace,
-  ) => Promise<(string | Sent)[]>;
-  submitTippedTxes: (
-    txes: CliqueTippedTx[],
-    trace: Trace,
-  ) => Promise<(string | Sent)[]>;
+  submitUntippedTx: (tx: Core.Transaction, trace: Trace) => Promise<Result>;
+  submitTippedTxes: (txes: CliqueTippedTx[], trace: Trace) => Promise<Result>;
   submitElectionTxes: (
     txes: CliqueElectionTx[],
     trace: Trace,
-  ) => Promise<(string | Sent)[]>;
+  ) => Promise<Result>;
 }
 
 const defaultName = `(unnamed) UtxoSource`;
@@ -329,11 +324,13 @@ export class UtxoSource {
         });
         if (msgs.length === 0) return [];
         else {
-          return await callback.run(
-            JSON.stringify(msgs),
-            `${this.name}.subscribeToAddressMsgs`,
-            trace,
-          );
+          return (
+            await callback.run(
+              JSON.stringify(msgs),
+              `${this.name}.subscribeToAddressMsgs`,
+              trace,
+            )
+          ).burn();
         }
       },
     );
@@ -376,7 +373,7 @@ export class UtxoSource {
   public subscribeToNewBlock = (
     subscriber: Wallet | BlocksStem | SocketServer<any, any, any>,
     callback: Callback<number>,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.log(`subscribeToNewBlock`);
     assert(
       subscriber instanceof Wallet ||
@@ -385,8 +382,11 @@ export class UtxoSource {
       `${this.name}.subscribeToAddress: subscriber neither TiamatSvm nor Wallet nor BlocksStem nor SocketServer`,
     );
     this.newBlockCallbacks.push(callback);
+    const trace = Trace.source(`SUB`, `${this.name}.subscribeToNewBlock`);
     if (this.subscribedToNewBlock)
-      return Promise.resolve([`${this.name}: already subscribed to new block`]);
+      return Promise.resolve(
+        new Result([`${this.name}: already subscribed to new block`], trace),
+      );
 
     this.subscribedToNewBlock = true;
     assert(
@@ -394,9 +394,9 @@ export class UtxoSource {
       `${this.name}: no socketClient in dummy UtxoSource`,
     );
     this.chainInterface.subscribeToNewBlock(this);
-    return Promise.resolve([
-      `${this.name}: successfully subscribed to new block`,
-    ]);
+    return Promise.resolve(
+      new Result([`${this.name}: successfully subscribed to new block`], trace),
+    );
   };
 
   // private subscribeToAck = (callback: Callback<number>) => {
@@ -423,12 +423,12 @@ export class UtxoSource {
     from: ChainInterface | this,
     events: UtxoEvents,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     assert(
       from === this.chainInterface || from === this,
       `${this.name}: notifyUtxoEvents from wrong chainInterface`,
     );
-    const promises: Promise<(string | Sent)[]>[] = [];
+    const promises: Promise<Result>[] = [];
     // const result: string[] = [];
 
     const id_ = Math.floor(Math.random() * 1000).toString();
@@ -523,7 +523,7 @@ export class UtxoSource {
     const result = (await Promise.all(promises)).flat(); // TODO what about this?
     // result.push(...(await Promise.all(promises)).flat());
     this.log(`notifyUtxoEvents ${id_}:`, result.length, `results`);
-    return result;
+    return new Result(result, trace);
   };
 
   /**
@@ -534,10 +534,10 @@ export class UtxoSource {
   public initialNotifyUtxoEvents = async (
     utxos: UtxoSet,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.log(`INITIAL NOTIFY`);
     // this.initialUtxos = utxos;
-    const promises: Promise<(string | Sent)[]>[] = [];
+    const promises: Promise<Result>[] = [];
     this.addressCallbacks.forEach((callbacks, address) => {
       const events: UtxoEvent[] = [];
 
@@ -568,7 +568,7 @@ export class UtxoSource {
         );
       }
     });
-    return (await Promise.all(promises)).flat();
+    return new Result((await Promise.all(promises)).flat(), trace);
   };
 
   /**
@@ -581,7 +581,7 @@ export class UtxoSource {
     from: ChainInterface,
     block: number,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     assert(
       from === this.chainInterface,
       `${this.name}: notifyNewBlock from wrong chainInterface`,
@@ -589,14 +589,14 @@ export class UtxoSource {
     const promises = this.newBlockCallbacks.map((callback) =>
       callback.run(block, `${this.name}.notifyNewBlock`, trace),
     );
-    return (await Promise.all(promises)).flat();
+    return new Result((await Promise.all(promises)).flat(), trace);
   };
 
   // public notifyAck = async (
   //   from: ChainInterface,
   //   txId: TxId,
   //   trace: Trace,
-  // ): Promise<(string | Sent)[]> => {
+  // ): Promise<Result> => {
   //   // throw new Error(
   //   //   `TODO FIXME (the Acks should be not all in one indiscriminate bag but per utxo/svm)`,
   //   // );
@@ -605,7 +605,7 @@ export class UtxoSource {
   //     `${this.name}: notifyNewBlock from wrong chainInterface`,
   //   );
   //   let callbacks = this.ackCallbacks.get(txId)?.splice(0);
-  //   const result: (string | Sent)[] = [];
+  //   const result: Result = [];
   //   while (callbacks?.length) {
   //     const promises = callbacks.map((callback) =>
   //       callback.run(txId, `${this.name}.notifyAck`, trace)
@@ -629,7 +629,7 @@ export class UtxoSource {
     tx: TxSigned,
     // ackCallback: Callback<TxId>,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.log(`submitUntippedTx`);
     this.log(`submitting to chain interface`);
     assert(
@@ -650,7 +650,7 @@ export class UtxoSource {
       if (!handleTxSubmissionErrors) {
         this.throw(msg);
       }
-      return [msg];
+      return new Result([msg], trace);
     }
   };
 
@@ -664,7 +664,7 @@ export class UtxoSource {
     txes: CliqueTippedTx[],
     // ackCallback: Callback<TxId>,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.log(`submitTippedTxes`);
     assert(
       this.chainInterface,
@@ -685,7 +685,7 @@ export class UtxoSource {
       if (!handleTxSubmissionErrors) {
         this.throw(msg);
       }
-      return [msg];
+      return new Result([msg], trace);
     }
   };
 
@@ -698,7 +698,7 @@ export class UtxoSource {
   public submitElectionTxes = async (
     txes: CliqueElectionTx[],
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.log(`submitElectionTxes`);
     const errorTimeout = new ErrorTimeout(
       this.name,
@@ -730,7 +730,7 @@ export class UtxoSource {
       if (!handleTxSubmissionErrors) {
         this.throw(msg);
       }
-      return [msg];
+      return new Result([msg], trace);
     }
   };
 

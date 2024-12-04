@@ -8,7 +8,7 @@ import {
 import assert from "assert";
 import { Wallet } from "../state/wallet";
 import { SocketClient } from "./socketClient";
-import { Sent, UtxoSource } from "../state/utxoSource";
+import { UtxoSource } from "../state/utxoSource";
 import { Token } from "../../types/general/derived/asset/token";
 import { Bech32Address, UtxoSet, Trace, Tx, P, W } from "../../utils/wrappers";
 import { TiamatContract } from "../state/tiamatContract";
@@ -16,9 +16,9 @@ import { errorTimeoutMs, numTxFees } from "../../utils/constants";
 import { WalletFundsPlexus } from "../data/plexus/walletFundsPlexus";
 import { ServitorPreconPlexus } from "../data/plexus/servitorPreconPlexus";
 import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
-import { Semaphore } from "./semaphore";
+import { Semaphore, Simplephore } from "./semaphore";
 import { Effector } from "../data/effector";
-import { Callback } from "../state/callback";
+import { Callback, Result } from "../state/callback";
 import { BlockHeight } from "../data/zygote";
 import { ElectionData } from "../state/electionData";
 import { TiamatCortex } from "../state/tiamatCortex";
@@ -93,9 +93,13 @@ export abstract class TiamatUser<
   public readonly servitorPreconPlexus: ServitorPreconPlexus<DC, DP, CT>;
 
   // mainly for blocking during election-margins
-  public readonly actionSemaphore = new Semaphore(`Action`);
+  public readonly actionSemaphore: Semaphore;
+  public readonly lockSemaphore: Simplephore; // This one is to avoid double-locking
 
-  private marginLockId?: string;
+  private marginLockIds?: {
+    actionId: string;
+    lockId: string;
+  };
 
   /**
    *
@@ -365,7 +369,8 @@ export abstract class TiamatUser<
     protected readonly servitorBlaze: Blaze<P, W>,
     public readonly servitorAddress: Bech32Address,
   ) {
-    // this.actionSemaphore = new Semaphore(`${this.name} Action`);
+    this.actionSemaphore = new Semaphore(`${this.name} Action`);
+    this.lockSemaphore = new Simplephore(`${this.name} Lock`);
     this.servitorWallet = new Wallet(
       `${name} Servitor`,
       servitorBlaze,
@@ -398,9 +403,10 @@ export abstract class TiamatUser<
           `always`,
           [`${this.name}`, `unlockAfterMargins`],
           (_data: BlockHeight, _trace: Trace) => {
-            if (this.marginLockId) {
-              this.actionSemaphore.discharge(this.marginLockId);
-              this.marginLockId = undefined;
+            if (this.marginLockIds) {
+              this.lockSemaphore.discharge(this.marginLockIds.lockId);
+              this.actionSemaphore.discharge(this.marginLockIds.actionId);
+              this.marginLockIds = undefined;
               return Promise.resolve([
                 `${this.name}.unlockAfterMargins: margin lock discharged`,
               ]);
@@ -420,7 +426,7 @@ export abstract class TiamatUser<
     );
   }
 
-  protected myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
+  protected myelinate = async (from: string[]): Promise<Result[]> => {
     const from_ = [...from, `TiamatUser: ${this.name}`];
     const result = await Promise.all([
       this.servitorFundsPlexus.myelinate(from_),
@@ -431,13 +437,32 @@ export abstract class TiamatUser<
     return result.flat();
   };
 
-  protected lockDuringMargins = async (_election: ElectionData<DC, DP>) => {
+  protected lockDuringMargins = async (
+    _election: ElectionData<DC, DP>,
+  ): Promise<Result> => {
     assert(
-      !this.marginLockId,
+      !this.marginLockIds,
       `${this.name}.lockDuringMargins: margin lock already latched`,
     );
-    this.marginLockId = await this.actionSemaphore.latch(`lockDuringMargins`);
-    return [`${this.name}.lockDuringMargins: margin lock latched`];
+    let result: string;
+    if (this.lockSemaphore.busy) {
+      result = `${this.name}.lockDuringMargins: lockSemaphore busy, skipping double lock`;
+    } else {
+      const lockId = this.lockSemaphore.latch(
+        `lockDuringMargins`,
+        `no timeout`,
+      ); // TODO timeout from election
+      const actionId = await this.actionSemaphore.latch(
+        `lockDuringMargins`,
+        `no timeout`,
+      ); // TODO timeout from election
+      this.marginLockIds = { actionId, lockId };
+      result = `${this.name}.lockDuringMargins: margin lock latched`;
+    }
+    return new Result(
+      [result],
+      Trace.source(`AUTO`, `${this.name}.lockDuringMargins`),
+    );
   };
 
   public newTx = async (ofWallet: `servitor` | `owner`): Promise<Tx> => {

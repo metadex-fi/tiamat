@@ -1,6 +1,5 @@
 import { Trace } from "../../utils/wrappers";
-import { Callback } from "../state/callback";
-import { Sent } from "../state/utxoSource";
+import { Callback, Result } from "../state/callback";
 import { Zygote } from "./zygote";
 
 /**
@@ -16,7 +15,7 @@ export class Effector<InZT extends Zygote> {
     zygote: InZT,
     from: string,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     return await this.effect.run(zygote, from, trace);
   };
 }

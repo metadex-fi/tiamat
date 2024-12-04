@@ -35,6 +35,7 @@ import {
 import { UtxoSource, Sent } from "./utxoSource";
 import { Token } from "../../types/general/derived/asset/token";
 import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
+import { Result } from "./callback";
 
 export interface MintingPolicy {
   policy: Core.Script;
@@ -189,7 +190,7 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
   public submitUntippedTx = async (
     tx: TxSigned,
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     this.log(`submitting to pubsub`);
     return await this.utxoSource.submitUntippedTx(tx, trace);
   };
@@ -203,7 +204,7 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
   public submitTippedTxes = async (
     txes: CliqueTippedTx[],
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     return await this.utxoSource.submitTippedTxes(txes, trace);
   };
 
@@ -216,7 +217,7 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
   public submitElectionTxes = async (
     txes: CliqueElectionTx[],
     trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     return await this.utxoSource.submitElectionTxes(txes, trace);
   };
 

@@ -8,8 +8,7 @@ import { Void } from "../../../types/general/derived/void";
 import { CliqueElectionTx } from "../../state/messages";
 import { computeSubsets } from "../../actions/tippingAction";
 import { TiamatContract } from "../../state/tiamatContract";
-import { Sent } from "../../state/utxoSource";
-import { Callback } from "../../state/callback";
+import { Callback, Result } from "../../state/callback";
 import { slotDurationMs } from "../../../utils/constants";
 import { Ganglion } from "../../data/ganglion";
 import { PDappConfigT, PDappParamsT } from "../../../types/tiamat/tiamat";
@@ -104,7 +103,7 @@ export class ElectionPrecon<
         trace: Trace,
       ): Promise<{
         fixTxCompleat: TxCompleat; // for chaining the action-tx
-        submitFixTx: () => Promise<(string | Sent)[]>;
+        submitFixTx: () => Promise<Result>;
       }> => {
         let fixTxCompleat: TxCompleat | null = null;
         const electionTxes: CliqueElectionTx[] = [];

@@ -6,6 +6,7 @@ import {
   slotDurationMs,
 } from "../../utils/constants";
 import { f } from "../../types/general/fundamental/type";
+import { time } from "console";
 
 /**
  *
@@ -53,7 +54,10 @@ export class Semaphore {
    * @param from
    * @param timeout
    */
-  public latch = async (from: string, timeout?: number): Promise<string> => {
+  public latch = async (
+    from: string,
+    timeout?: number | `no timeout`,
+  ): Promise<string> => {
     await new Promise<void>((resolve) => setTimeout(resolve, 0)); // NOTE to get it into the event loop, not sure about it
     const id = `${this.name}.${from}.${this.tickets++}`;
     assert(!this.seized, `${this.name}.latch(${id}): Semaphore is seized`); // TODO FIXME (not a priority)
@@ -65,21 +69,23 @@ export class Semaphore {
     }
     this.count++;
     this.holders.add(id);
-    const timeout_ = timeout ?? semaphoreTimeoutMs;
-    if (timeout_) {
-      this.errorTimeout = setTimeout(() => {
-        const msg = `${this.name}: Semaphore hugged too long by\n${id}\nfor ${timeout_} ms\nwaiting: [\n${f}${this.waitingIDs}\n]`;
-        if (this.log) console.log(msg);
+    if (timeout !== `no timeout`) {
+      const timeout_ = timeout ?? semaphoreTimeoutMs;
+      if (timeout_) {
+        this.errorTimeout = setTimeout(() => {
+          const msg = `${this.name}: Semaphore hugged too long by\n${id}\nfor ${timeout_} ms\nwaiting: [\n${f}${this.waitingIDs}\n]`;
+          if (this.log) console.log(msg);
 
-        // NOTE timeout for throw such that others can log too
-        if (errorTimeoutMs === null) {
-          throw new Error(msg);
-        } else {
-          setTimeout(() => {
+          // NOTE timeout for throw such that others can log too
+          if (errorTimeoutMs === null) {
             throw new Error(msg);
-          }, errorTimeoutMs);
-        }
-      }, timeout_);
+          } else {
+            setTimeout(() => {
+              throw new Error(msg);
+            }, errorTimeoutMs);
+          }
+        }, timeout_);
+      }
     }
     return id;
   };
@@ -154,7 +160,7 @@ export class Simplephore {
    * @param from
    * @param timeout
    */
-  public latch = (from: string, timeout?: number): string => {
+  public latch = (from: string, timeout?: number | `no timeout`): string => {
     const id = `${this.name}.${from}`;
     assert(
       this.holder === null,
@@ -164,22 +170,24 @@ export class Simplephore {
     );
     this.holder = id;
     this.since = Date.now();
-    const timeout_ = timeout ?? semaphoreTimeoutMs;
 
-    if (timeout_) {
-      this.errorTimeout = setTimeout(() => {
-        const msg = `${this.name}: Simplephore hugged too long by ${id}`;
-        console.log(msg);
+    if (timeout !== `no timeout`) {
+      const timeout_ = timeout ?? semaphoreTimeoutMs;
+      if (timeout_) {
+        this.errorTimeout = setTimeout(() => {
+          const msg = `${this.name}: Simplephore hugged too long by ${id}`;
+          console.log(msg);
 
-        // NOTE timeout for throw such that others can log too
-        if (errorTimeoutMs === null) {
-          throw new Error(msg);
-        } else {
-          setTimeout(() => {
+          // NOTE timeout for throw such that others can log too
+          if (errorTimeoutMs === null) {
             throw new Error(msg);
-          }, errorTimeoutMs);
-        }
-      }, timeout_);
+          } else {
+            setTimeout(() => {
+              throw new Error(msg);
+            }, errorTimeoutMs);
+          }
+        }, timeout_);
+      }
     }
 
     return id;

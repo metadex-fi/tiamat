@@ -25,9 +25,8 @@ import {
   Trace,
   TraceUtxo,
 } from "../../utils/wrappers";
-import { Callback } from "./callback";
+import { Callback, Result } from "./callback";
 import { TiamatContract } from "./tiamatContract";
-import { Sent } from "./utxoSource";
 import { TiamatSvmUtxo } from "./tiamatSvmUtxo";
 import { Hash } from "../../types/general/derived/hash/hash";
 import { Token } from "../../types/general/derived/asset/token";
@@ -168,7 +167,7 @@ export class TiamatSvm<
     subscriber: SvmStem<PConfig, PState, PAction>,
     callback: Callback<TiamatSvmUtxo<PConfig, PState, PAction>[]>,
     tolerance = 0,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     assert(
       subscriber instanceof SvmStem,
       `${this.name}.subscribe: subscriber not SvmStem`,
@@ -316,7 +315,7 @@ export class TiamatSvm<
             const callbacks_: Callback<
               TiamatSvmUtxo<PConfig, PState, PAction>[]
             >[] = [];
-            const result = (
+            const result: (Result | string)[] = (
               await Promise.all(
                 this.callbacks.map((callback) => {
                   if (callback.perform === `always`) {
@@ -362,7 +361,7 @@ export class TiamatSvm<
       `once`,
       [this.name, `mkAckCallback`],
       async (svmUtxos, trace) => {
-        let result: (string | Sent)[] | null = null;
+        let result: Result | null = null;
         for (const svmUtxo_ of svmUtxos) {
           if (svmUtxo_.idNFT.equals(svmUtxo.idNFT)) {
             assert(
@@ -385,7 +384,7 @@ export class TiamatSvm<
           this.throw(`mkAckCallback: no utxo`);
           return [`${this.name}.mkAckCallback: ERROR - no utxo`];
         } else {
-          return result;
+          return [result];
         }
       },
     );

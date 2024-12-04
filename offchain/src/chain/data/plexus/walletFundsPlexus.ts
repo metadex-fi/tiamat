@@ -4,7 +4,7 @@ import { Trace } from "../../../utils/wrappers";
 import { Wallet } from "../../state/wallet";
 import { Plexus } from "../plexus";
 import { WalletFunds } from "../zygote";
-import { Sent } from "../../state/utxoSource";
+import { Result } from "../../state/callback";
 
 /**
  *
@@ -25,7 +25,7 @@ export class WalletFundsPlexus extends Plexus {
     this.walletFundsStem = new WalletFundsStem(wallet, senseWalletFunds);
   }
 
-  public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
+  public myelinate = async (from: string[]): Promise<Result[]> => {
     const from_ = [...from, `WalletFundsPlexus: ${this.wallet.name}`];
     return await this.walletFundsStem.myelinate(from_);
   };

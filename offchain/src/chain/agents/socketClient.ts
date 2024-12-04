@@ -7,7 +7,7 @@ import {
   UtxoEvents,
   UtxoSource,
 } from "../state/utxoSource";
-import { Callback } from "../state/callback";
+import { Callback, Result } from "../state/callback";
 import {
   // AckMsg,
   AddressSubscriptionMsg,
@@ -140,13 +140,15 @@ export class SocketClient implements ChainInterface {
     DP extends PDappParamsT,
   >(
     election: ElectionData<DC, DP>,
-    _trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+    trace: Trace,
+  ): Promise<Result> => {
     this.numSupportVectors = election.tiamatParams.num_support_vectors;
     this.vectorData = election.eligibleEVsValencies;
     const newVectorIpPorts = [...this.vectorData.keys()];
     this.updateVectorConnections(newVectorIpPorts);
-    return await Promise.resolve([`${this.name}: connections updated`]);
+    return await Promise.resolve(
+      new Result([`${this.name}: connections updated`], trace),
+    );
   };
 
   /**
@@ -220,8 +222,8 @@ export class SocketClient implements ChainInterface {
    */
   public submitUntippedTx = async (
     tx: Core.Transaction,
-    _trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+    trace: Trace,
+  ): Promise<Result> => {
     this.log(`submitUntippedTx`);
     const sent = Sent.fromTransaction(tx);
     const msg: UntippedTxMsg = {
@@ -229,7 +231,7 @@ export class SocketClient implements ChainInterface {
       tag: `untipped tx`,
     };
     const msg_ = JSON.stringify(msg);
-    return [await this.submitTxesMsg(msg_, `all`), sent];
+    return new Result([await this.submitTxesMsg(msg_, `all`), sent], trace);
   };
 
   /**
@@ -239,8 +241,8 @@ export class SocketClient implements ChainInterface {
    */
   public submitTippedTxes = async (
     txes: CliqueTippedTx[],
-    _trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+    trace: Trace,
+  ): Promise<Result> => {
     this.log(`submitTippedTxes`);
     const promises = txes.map(async (tx) => {
       const sent = Sent.fromTransaction(tx.tx.partiallySignedPayloadTx);
@@ -252,7 +254,7 @@ export class SocketClient implements ChainInterface {
       const result = await this.submitTxesMsg(msg_, tx.supportVectorSet);
       return [result, sent];
     });
-    return (await Promise.all(promises)).flat();
+    return new Result((await Promise.all(promises)).flat(), trace);
   };
 
   /**
@@ -262,8 +264,8 @@ export class SocketClient implements ChainInterface {
    */
   public submitElectionTxes = async (
     txes: CliqueElectionTx[],
-    _trace: Trace,
-  ): Promise<(string | Sent)[]> => {
+    trace: Trace,
+  ): Promise<Result> => {
     this.log(`submitElectionTxes`);
     const promises = txes.map(async (tx) => {
       const sent = Sent.fromTransaction(tx.tx.partiallySignedElectionTx);
@@ -275,7 +277,7 @@ export class SocketClient implements ChainInterface {
       const result = await this.submitTxesMsg(msg_, tx.supportVectorSet);
       return [result, sent];
     });
-    return (await Promise.all(promises)).flat();
+    return new Result((await Promise.all(promises)).flat(), trace);
   };
 
   //////////////////////////////////////////
@@ -407,14 +409,11 @@ export class SocketClient implements ChainInterface {
         typeof event.data === "string",
         `${this.name}.connectToVector.onmessage: data not string: ${event.data}`,
       );
-      const result: (string | Sent)[] = await this.receiveVectorMessage(
+      const result: Result = await this.receiveVectorMessage(
         event.data,
         vectorIpPort,
       );
-      result.forEach((r) => {
-        if (typeof r === "string") this.log(`RESULT`, r);
-        else this.log(`RESULT SENT:`, r.txId.txId);
-      });
+      result.burn().forEach((r) => this.log(r));
     };
     /**
      *
@@ -479,14 +478,15 @@ export class SocketClient implements ChainInterface {
   private receiveVectorMessage = async (
     data: string,
     vectorIpPort: IpPort,
-  ): Promise<(string | Sent)[]> => {
+  ): Promise<Result> => {
     if (maxUserMsgDelay !== null) {
       await new Promise((resolve) =>
         setTimeout(resolve, Math.random() * maxUserMsgDelay!),
       );
     }
+    const trace = Trace.source(`SOCKET`, `${this.name}.receiveVectorMessage`);
     if (this.processedMsgsIn.has(data)) {
-      return [`already processed ${data}`];
+      return new Result([`already processed ${data}`], trace);
     }
 
     let count = this.getVectorValency(vectorIpPort);
@@ -498,7 +498,7 @@ export class SocketClient implements ChainInterface {
         `not elected anymore`,
       );
       this.throw(`this should not happen`);
-      return [`this should not happen`];
+      return new Result([`this should not happen`], trace);
     } else {
       const confirmations = this.pendingMsgsIn.get(data);
       const by = confirmations?.by ?? new Set();
@@ -509,7 +509,10 @@ export class SocketClient implements ChainInterface {
       );
       if (confirmations) {
         if (by.has(vectorKeyHash.concise())) {
-          return [`already confirmed by ${vectorKeyHash}: ${data}`];
+          return new Result(
+            [`already confirmed by ${vectorKeyHash}: ${data}`],
+            trace,
+          );
         } else {
           count += confirmations.count;
         }
@@ -524,7 +527,10 @@ export class SocketClient implements ChainInterface {
         by.add(vectorKeyHash.concise());
         const confirmations_: Confirmations = { count, by };
         this.pendingMsgsIn.set(data, confirmations_);
-        return [`${count}/${requiredConfirmations} confirmations for ${data}`];
+        return new Result(
+          [`${count}/${requiredConfirmations} confirmations for ${data}`],
+          trace,
+        );
       }
     }
   };
@@ -533,13 +539,11 @@ export class SocketClient implements ChainInterface {
    *
    * @param data
    */
-  private processVectorMessage = async (
-    data: string,
-  ): Promise<(string | Sent)[]> => {
+  private processVectorMessage = async (data: string): Promise<Result> => {
     // const msgs: NewBlockMsg | UtxoEventMsg[] | AckMsg = JSON.parse(data);
     const msgs: NewBlockMsg | UtxoEventMsg[] = JSON.parse(data);
 
-    const promises: Promise<(string | Sent)[]>[] = [];
+    const promises: Promise<Result>[] = [];
     if (msgs instanceof Array) {
       this.log(`multiple messages (${msgs.length})`);
       const utxoEvents = new UtxoEvents(
@@ -650,7 +654,10 @@ export class SocketClient implements ChainInterface {
       // }
     }
 
-    return (await Promise.all(promises)).flat();
+    return new Result(
+      (await Promise.all(promises)).flat(),
+      Trace.source(`SOCKET`, `${this.name}.processVectorMessage`),
+    );
   };
 
   /**

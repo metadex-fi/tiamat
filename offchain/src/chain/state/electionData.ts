@@ -139,6 +139,8 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
         assert(eigenValue, `Elect: no eigenvalue for ${roll}`);
         eligibleEVs.push(eigenValue);
       }
+    } else {
+      console.log(`ElectionData: NO REGISTERED VECTORS!`);
     }
     if (logElection) {
       console.log(

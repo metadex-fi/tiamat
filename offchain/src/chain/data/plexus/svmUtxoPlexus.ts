@@ -7,7 +7,7 @@ import { TiamatSvmUtxo } from "../../state/tiamatSvmUtxo";
 import { SvmStem } from "../stem";
 import { MaybeSvmUtxo } from "../zygote";
 import { Plexus } from "../plexus";
-import { Sent } from "../../state/utxoSource";
+import { Result } from "../../state/callback";
 
 export class SvmUtxoPlexus<
   PConfig extends PData,
@@ -48,7 +48,7 @@ export class SvmUtxoPlexus<
     this.svmUtxoStem = new SvmStem(svm, senseSvmUtxo, tolerance);
   }
 
-  public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
+  public myelinate = async (from: string[]): Promise<Result[]> => {
     const from_ = [...from, `SvmUtxoPlexus`];
     return await this.svmUtxoStem.myelinate(from_);
   };

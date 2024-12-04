@@ -16,10 +16,9 @@ import { ElectionData } from "../../state/electionData";
 import { BlockHeight, MaybeSvmUtxo, Zygote } from "../zygote";
 import { PDappConfigT, PDappParamsT } from "../../../types/tiamat/tiamat";
 import { BlocksGanglion, BlocksPlexus } from "./blocksPlexus";
-import { Callback } from "../../state/callback";
+import { Callback, Result } from "../../state/callback";
 import { Effector } from "../effector";
 import { Trace } from "../../../utils/wrappers";
-import { Sent } from "../../state/utxoSource";
 
 type MC = PMatrixConfig;
 type MS = PMatrixState;
@@ -58,7 +57,7 @@ class MatrixNexusBlock<DC extends PDappConfigT, DP extends PDappParamsT>
   constructor(
     public readonly matrix: MatrixUtxo,
     public readonly nexus: NexusUtxo<DC, DP>,
-    public readonly block: number,
+    public readonly block: number | `virginal`,
   ) {}
 
   public equals = (other: MatrixNexusBlock<DC, DP>): boolean => {
@@ -103,11 +102,7 @@ class MatrixNexusBlocksGanglion<
         maybeMatrix && maybeNexus && maybeBlock,
         `${name} procedure: matrixUtxo (${maybeMatrix}) and/or nexusUtxo (${maybeNexus}) and/or blockHeight (${maybeBlock}) undefined`,
       );
-      if (
-        maybeMatrix === `virginal` ||
-        maybeNexus === `virginal` ||
-        maybeBlock === `virginal`
-      ) {
+      if (maybeMatrix === `virginal` || maybeNexus === `virginal`) {
         return Promise.resolve(`virginal`);
       }
       const matrix = maybeMatrix as MaybeMatrix;
@@ -115,8 +110,7 @@ class MatrixNexusBlocksGanglion<
       const block = maybeBlock as BlockHeight;
       if (
         typeof matrix.maybeUtxo === `string` ||
-        typeof nexus.maybeUtxo === `string` ||
-        typeof block.maybeBlock === `string`
+        typeof nexus.maybeUtxo === `string`
       ) {
         throw {
           name: `AbortError`,
@@ -201,21 +195,26 @@ export class CurrentElectionEffector<
     updateConnections: (
       election: ElectionData<DC, DP>,
       trace: Trace,
-    ) => Promise<(string | Sent)[]>, // TODO
+    ) => Promise<Result>, // TODO
   ) {
     name = `${name} CurrentElectionEffector`;
     const connect = async (
       data: ElectionData<DC, DP>,
       trace: Trace,
-    ): Promise<(string | Sent)[]> => {
+    ): Promise<[Result]> => {
       const phase = data.phase.type;
       if (
         phase === `within single margin` ||
         phase === `within double margin`
       ) {
-        return [`${name}: within double margin or less, not connecting`];
+        return [
+          new Result(
+            [`${name}: within double margin or less, not connecting`],
+            trace,
+          ),
+        ];
       } else {
-        return await updateConnections(data, trace);
+        return [await updateConnections(data, trace)];
       }
     };
     const currentElectionEffect = new Callback(
@@ -243,19 +242,17 @@ export class NextElectionEffector<
   private singleMarginTimeout?: NodeJS.Timeout;
   constructor(
     name: string,
-    prepareForConnections: (
-      election: ElectionData<DC, DP>,
-    ) => Promise<(string | Sent)[]>, // TODO
+    prepareForConnections: (election: ElectionData<DC, DP>) => Promise<Result>, // TODO
     updateConnections: (
       election: ElectionData<DC, DP>,
       trace: Trace,
-    ) => Promise<(string | Sent)[]>, // TODO
+    ) => Promise<Result>, // TODO
   ) {
     name = `${name} NextElectionEffector`;
     const discernMargins = async (
       data: ElectionData<DC, DP>,
       trace: Trace,
-    ): Promise<(string | Sent)[]> => {
+    ): Promise<[Result]> => {
       clearTimeout(this.doubleMarginTimeout);
       clearTimeout(this.singleMarginTimeout);
 
@@ -263,7 +260,10 @@ export class NextElectionEffector<
       switch (phase.type) {
         case `more than one block`:
           return [
-            `${name}: more than one block from next cycle, doing nothing`,
+            new Result(
+              [`${name}: more than one block from next cycle, doing nothing`],
+              trace,
+            ),
           ];
         case `less than one block`:
           this.doubleMarginTimeout = setTimeout(
@@ -274,20 +274,27 @@ export class NextElectionEffector<
             () => updateConnections(data, trace),
             phase.untilSingleMarginMs,
           );
-          return [`${name}: less than one block from next cycle`];
+          return [
+            new Result([`${name}: less than one block from next cycle`], trace),
+          ];
         case `within double margin`:
           this.singleMarginTimeout = setTimeout(
             () => updateConnections(data, trace),
             phase.untilSingleMarginMs,
           );
-          return await prepareForConnections(data);
+          return [await prepareForConnections(data)];
         case `within single margin`:
-          return (
-            await Promise.all([
-              prepareForConnections(data),
-              updateConnections(data, trace),
-            ])
-          ).flat();
+          return [
+            new Result(
+              (
+                await Promise.all([
+                  prepareForConnections(data),
+                  updateConnections(data, trace),
+                ])
+              ).flat(),
+              trace,
+            ),
+          ];
       }
     };
 
@@ -373,13 +380,11 @@ export class ElectionsPlexus<
   }
 
   public innervateMarginEffectors = (
-    prepareForConnections: (
-      election: ElectionData<DC, DP>,
-    ) => Promise<(string | Sent)[]>,
+    prepareForConnections: (election: ElectionData<DC, DP>) => Promise<Result>,
     updateConnections: (
       election: ElectionData<DC, DP>,
       trace: Trace,
-    ) => Promise<(string | Sent)[]>,
+    ) => Promise<Result>,
   ) => {
     assert(
       !this.electionEffectors,
@@ -406,7 +411,7 @@ export class ElectionsPlexus<
     this.nextElectionGanglion.innervateEffector(nextElectionEffector);
   };
 
-  public myelinate = async (from: string[]): Promise<(string | Sent)[]> => {
+  public myelinate = async (from: string[]): Promise<Result[]> => {
     const from_ = [...from, `ElectionPreconPlexus`];
     const result = await Promise.all([
       this.matrixNexusBlocksGanglion.myelinate(from_),
