@@ -32,7 +32,7 @@ import {
   nexusLabel,
   vestingLabel,
 } from "../../utils/constants";
-import { UtxoSource, Sent } from "./utxoSource";
+import { UtxoSource } from "./utxoSource";
 import { Token } from "../../types/general/derived/asset/token";
 import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
 import { Result } from "./callback";
@@ -192,7 +192,10 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
     trace: Trace,
   ): Promise<Result> => {
     this.log(`submitting to pubsub`);
-    return await this.utxoSource.submitUntippedTx(tx, trace);
+    return await this.utxoSource.submitUntippedTx(
+      tx,
+      trace.via(`${this.name}.submitUntippedTx`),
+    );
   };
 
   /**
@@ -205,7 +208,10 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
     txes: CliqueTippedTx[],
     trace: Trace,
   ): Promise<Result> => {
-    return await this.utxoSource.submitTippedTxes(txes, trace);
+    return await this.utxoSource.submitTippedTxes(
+      txes,
+      trace.via(`${this.name}.submitTippedTxes`),
+    );
   };
 
   /**
@@ -218,7 +224,10 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
     txes: CliqueElectionTx[],
     trace: Trace,
   ): Promise<Result> => {
-    return await this.utxoSource.submitElectionTxes(txes, trace);
+    return await this.utxoSource.submitElectionTxes(
+      txes,
+      trace.via(`${this.name}.submitElectionTxes`),
+    );
   };
 
   /**

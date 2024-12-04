@@ -461,6 +461,8 @@ export abstract class TiamatUser<
     }
     return new Result(
       [result],
+      this.name,
+      `lockDuringMargins`,
       Trace.source(`AUTO`, `${this.name}.lockDuringMargins`),
     );
   };

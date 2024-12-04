@@ -352,10 +352,11 @@ export class Wallet {
   };
 
   private processCallbacks = async (trace: Trace): Promise<Result[]> => {
+    const trace_ = trace.via(`processCallbacks`);
     return (
       await Promise.all([
-        this.processUtxoSetCallbacks(trace),
-        this.processFundsCallbacks(trace),
+        this.processUtxoSetCallbacks(trace_),
+        this.processFundsCallbacks(trace_),
       ])
     ).flat();
   };
@@ -372,7 +373,7 @@ export class Wallet {
           return callback.run(
             this.available,
             `${this.name}.processUtxoSetCallbacks`,
-            trace,
+            trace.via(`${this.name}.processUtxoSetCallbacks`),
           );
         }),
       )
@@ -394,7 +395,7 @@ export class Wallet {
           return callback.run(
             this.funds,
             `${this.name}.processFundsCallbacks`,
-            trace,
+            trace.via(`${this.name}.processFundsCallbacks`),
           );
         }),
       )

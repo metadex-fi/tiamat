@@ -194,7 +194,7 @@ export class CurrentElectionEffector<
     name: string,
     updateConnections: (
       election: ElectionData<DC, DP>,
-      trace: Trace,
+      trace2: Trace,
     ) => Promise<Result>, // TODO
   ) {
     name = `${name} CurrentElectionEffector`;
@@ -202,6 +202,7 @@ export class CurrentElectionEffector<
       data: ElectionData<DC, DP>,
       trace: Trace,
     ): Promise<[Result]> => {
+      const trace_ = trace.via(`${name}.connect`);
       const phase = data.phase.type;
       if (
         phase === `within single margin` ||
@@ -209,12 +210,14 @@ export class CurrentElectionEffector<
       ) {
         return [
           new Result(
-            [`${name}: within double margin or less, not connecting`],
-            trace,
+            [`within double margin or less, not connecting`],
+            this.name,
+            `connect`,
+            trace_,
           ),
         ];
       } else {
-        return [await updateConnections(data, trace)];
+        return [await updateConnections(data, trace_)];
       }
     };
     const currentElectionEffect = new Callback(
@@ -245,7 +248,7 @@ export class NextElectionEffector<
     prepareForConnections: (election: ElectionData<DC, DP>) => Promise<Result>, // TODO
     updateConnections: (
       election: ElectionData<DC, DP>,
-      trace: Trace,
+      trace2: Trace,
     ) => Promise<Result>, // TODO
   ) {
     name = `${name} NextElectionEffector`;
@@ -255,14 +258,17 @@ export class NextElectionEffector<
     ): Promise<[Result]> => {
       clearTimeout(this.doubleMarginTimeout);
       clearTimeout(this.singleMarginTimeout);
+      const trace_ = trace.via(`${name}.discernMargins`);
 
       const phase = data.phase;
       switch (phase.type) {
         case `more than one block`:
           return [
             new Result(
-              [`${name}: more than one block from next cycle, doing nothing`],
-              trace,
+              [`more than one block from next cycle, doing nothing`],
+              this.name,
+              `discernMargins`,
+              trace_,
             ),
           ];
         case `less than one block`:
@@ -271,15 +277,20 @@ export class NextElectionEffector<
             phase.untilDoubleMarginMs,
           );
           this.singleMarginTimeout = setTimeout(
-            () => updateConnections(data, trace),
+            () => updateConnections(data, trace_),
             phase.untilSingleMarginMs,
           );
           return [
-            new Result([`${name}: less than one block from next cycle`], trace),
+            new Result(
+              [`less than one block from next cycle`],
+              this.name,
+              `discernMargins`,
+              trace_,
+            ),
           ];
         case `within double margin`:
           this.singleMarginTimeout = setTimeout(
-            () => updateConnections(data, trace),
+            () => updateConnections(data, trace_),
             phase.untilSingleMarginMs,
           );
           return [await prepareForConnections(data)];
@@ -289,10 +300,12 @@ export class NextElectionEffector<
               (
                 await Promise.all([
                   prepareForConnections(data),
-                  updateConnections(data, trace),
+                  updateConnections(data, trace_),
                 ])
               ).flat(),
-              trace,
+              this.name,
+              `discernMargins`,
+              trace_,
             ),
           ];
       }
@@ -383,7 +396,7 @@ export class ElectionsPlexus<
     prepareForConnections: (election: ElectionData<DC, DP>) => Promise<Result>,
     updateConnections: (
       election: ElectionData<DC, DP>,
-      trace: Trace,
+      trace2: Trace,
     ) => Promise<Result>,
   ) => {
     assert(

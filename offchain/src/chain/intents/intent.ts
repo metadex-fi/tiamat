@@ -57,7 +57,7 @@ export abstract class Intent<
       actionTxAckCallback: Callback<TxId>, // for status updates
       setAckTxId: (txId: TxId) => void, // for the ack-callback
       conflux: Conflux<ChoicesT, StatusT>,
-      trace: Trace,
+      trace2: Trace,
     ) => Promise<Result>, // construct action-tx, add tips (if applicable), compleat, sign, submit, etc.
   ) {
     this.name = `${user.name} Intent`;
@@ -144,10 +144,15 @@ export abstract class Intent<
     };
     const actionAckCallbackFn = async (
       txId: TxId,
-      trace: Trace,
+      trace2: Trace,
     ): Promise<[Result]> => {
       this.log(`actionAckCallbackFn: received ACK:\n <~~`, txId.txId);
-      const result = new Result([`ACK: ${txId.txId}`], trace);
+      const result = new Result(
+        [`ACK: ${txId.txId}`],
+        this.name,
+        `execute_`,
+        trace,
+      );
       assert(
         expectedTxId,
         `${this.name}.actionAckCallbackFn: expectedTxId not set`,
@@ -224,7 +229,7 @@ export abstract class Intent<
         ),
       );
     }
-    return new Result(result, trace);
+    return new Result(result, this.name, `execute_`, trace);
   };
 
   public cancel = async (): Promise<void> => {

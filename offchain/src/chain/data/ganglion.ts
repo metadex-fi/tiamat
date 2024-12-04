@@ -2,7 +2,6 @@ import assert from "assert";
 import { blockDurationMs, errorTimeoutMs } from "../../utils/constants";
 import { Zygote } from "./zygote";
 import { Effector } from "./effector";
-import { Sent } from "../state/utxoSource";
 import { Trace } from "../../utils/wrappers";
 import { ErrorTimeout } from "../../utils/errorTimeout";
 import { Simplephore } from "../agents/semaphore";
@@ -32,7 +31,7 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
   protected doubleTapped = false;
 
   constructor(
-    protected readonly name: string,
+    public readonly name: string,
     private readonly afferents: {
       [K in keyof InZsT]: Ganglion<any[], InZsT[K]>;
     },
@@ -81,7 +80,7 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
     assert(this.myelinated, `${this.name}.induce: Ganglion not myelinated`);
     // this.abortController?.abort(); // TODO FIXME
     this.abortController = new AbortController();
-    this.process(this.abortController.signal, trace);
+    this.process(this.abortController.signal, trace.via(`${this.name}.induce`));
   };
 
   /**
@@ -144,9 +143,10 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
       return;
     }
     const processID = this.processSemaphore.latch(`process`);
+    const trace_ = trace.via(`${this.name}.process`);
     while (true) {
       try {
-        this.log(`Processing`, trace.compose());
+        this.log(`Processing`, trace_.compose());
         const afferentStates = new Map(
           this.afferents.map((afferent) => {
             const scion = afferent.scion;
@@ -173,7 +173,7 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
           } else {
             this.log(`State changed:\n`, this.current, `\n\t⬇\n`, newState);
             this.current = newState;
-            this.induceEfferents(newState, trace);
+            this.induceEfferents(newState, trace_);
           }
         }
       } catch (e) {
@@ -203,7 +203,7 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
       `\nand effectors:\n`,
       this.effectors.map((e) => e.name),
     );
-    const trace_ = trace.via(this.name);
+    const trace_ = trace.via(`${this.name}.induceEfferents`);
     const inductionPromises = [
       ...this.efferents.map((efferent) =>
         // TODO ugly

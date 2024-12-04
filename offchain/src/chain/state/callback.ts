@@ -5,7 +5,7 @@ import {
   errorTimeoutMs,
   logCallbackFns,
   logCallbacks,
-  resultPrintTimeoutMs,
+  printTimeoutMs,
 } from "../../utils/constants";
 import { Sent } from "./utxoSource";
 import { Trace } from "../../utils/wrappers";
@@ -15,16 +15,30 @@ export class Result {
   readonly __brand = `Result`;
   private burned = false;
   private timeout?: ErrorTimeout;
+  private readonly messages: string[];
   constructor(
-    private readonly messages: (Result | string | Sent)[],
+    messages: (Result | string | Sent)[],
+    from: string,
+    via: string,
     trace: Trace,
   ) {
-    if (resultPrintTimeoutMs !== null) {
+    this.messages = messages
+      .map((msg) => {
+        if (msg instanceof Result) {
+          return msg.burn();
+        }
+        if (msg instanceof Sent) {
+          return [`RESULT SENT: ${from}.${via}: ${msg.txId.txId}`];
+        }
+        return [`RESULT: ${from}.${via}: ${msg}`];
+      })
+      .flat();
+    if (printTimeoutMs !== null) {
       this.timeout = new ErrorTimeout(
-        `Result`,
-        `PrintTimeout`,
-        resultPrintTimeoutMs,
-        trace,
+        `${this.messages.join(`\n`)}\n\n`,
+        `NOT PRINTED IN TIME`,
+        printTimeoutMs,
+        trace.via(`${from}.${via}`),
       );
     }
   }
@@ -34,15 +48,7 @@ export class Result {
     this.timeout = undefined;
     assert(!this.burned, `Result already burned`);
     this.burned = true;
-    return this.messages
-      .map((msg) =>
-        msg instanceof Result
-          ? msg.burn()
-          : msg instanceof Sent
-            ? [`RESULT SENT: ${msg.txId.txId}`]
-            : [`RESULT: ${msg}`],
-      )
-      .flat();
+    return this.messages;
   };
 }
 
@@ -53,7 +59,11 @@ export class Callback<T> {
   public readonly fullName: string;
   private readonly shortName: string; // use fullName
   static count = 0;
-  public readonly run: (data: T, from: string, trace: Trace) => Promise<Result>;
+  public readonly run: (
+    data: T,
+    from: string,
+    trace2: Trace,
+  ) => Promise<Result>;
   // public readonly name: string;
   /**
    *
@@ -64,7 +74,7 @@ export class Callback<T> {
   constructor(
     public readonly perform: `once` | `always`,
     id: (string | undefined)[],
-    callback: (data: T, trace: Trace) => Promise<(Result | string | Sent)[]>,
+    callback: (data: T, trace2: Trace) => Promise<(Result | string | Sent)[]>,
   ) {
     const count = Callback.count++;
     const id_ = id.filter((id) => id !== undefined);
@@ -137,7 +147,7 @@ export class Callback<T> {
       if (result instanceof Result) {
         return result;
       } else {
-        return new Result(result, trace);
+        return new Result(result, this.shortName, from, trace);
       }
     };
   }

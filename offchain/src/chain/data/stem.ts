@@ -1,7 +1,7 @@
 import { Core } from "@blaze-cardano/sdk";
 import { PData } from "../../types/general/fundamental/type";
 import { Trace, UtxoSet } from "../../utils/wrappers";
-import { Callback, Result } from "../state/callback";
+import { Callback } from "../state/callback";
 import { TiamatSvm } from "../state/tiamatSvm";
 import { TiamatSvmUtxo } from "../state/tiamatSvmUtxo";
 import { Wallet } from "../state/wallet";
@@ -41,7 +41,7 @@ const neverProcedure = async <ZT extends Zygote>(
 class Stem<PerceptT, ZT extends Zygote> extends Ganglion<ZT[], ZT> {
   constructor(
     name: string,
-    private readonly sensing: (percept: PerceptT, trace: Trace) => Promise<ZT>,
+    private readonly sensing: (percept: PerceptT, trace2: Trace) => Promise<ZT>,
   ) {
     super(name, [], neverProcedure);
   }
@@ -56,11 +56,12 @@ class Stem<PerceptT, ZT extends Zygote> extends Ganglion<ZT[], ZT> {
     }
     const processID = this.processSemaphore.latch(`process`);
     const result: string[] = [];
+    const trace_ = trace.via(`${this.name}.sense`);
     while (true) {
       try {
-        const trace_ = trace.compose();
-        this.log(`Sensing`, trace_);
-        const perception = await this.sensing(percept, trace);
+        const trace__ = trace_.compose();
+        this.log(`Sensing`, trace__);
+        const perception = await this.sensing(percept, trace_);
         if (this.current !== `virginal` && this.current.equals(perception)) {
           this.log(`No change in perception:`, this.current);
           result.push(`${this.name}: No change in perception`);
@@ -72,7 +73,7 @@ class Stem<PerceptT, ZT extends Zygote> extends Ganglion<ZT[], ZT> {
             perception,
           );
           this.current = perception;
-          this.induceEfferents(perception, trace);
+          this.induceEfferents(perception, trace_);
           result.push(`${this.name}: Perception changed`);
         }
       } catch (e) {
@@ -106,7 +107,7 @@ export class SvmStem<
     svm: TiamatSvm<PConfig, PState, PAction>,
     sensing: (
       svmUtxos: TiamatSvmUtxo<PConfig, PState, PAction>[],
-      trace: Trace,
+      trace2: Trace,
     ) => Promise<MaybeSvmUtxo<PConfig, PState, PAction>>,
     tolerance = 0,
   ) {
@@ -123,7 +124,7 @@ export class WalletUtxosStem extends Stem<UtxoSet, WalletUtxos> {
   readonly __brand = `WalletUtxosStem`;
   constructor(
     wallet: Wallet,
-    sensing: (walletUtxos: UtxoSet, trace: Trace) => Promise<WalletUtxos>,
+    sensing: (walletUtxos: UtxoSet, trace2: Trace) => Promise<WalletUtxos>,
   ) {
     const name = `${wallet.name} WalletUtxosStem`;
     super(name, sensing);
@@ -147,7 +148,7 @@ export class WalletFundsStem extends Stem<
     wallet: Wallet,
     sensing: (
       walletFunds: Map<Core.AssetId, bigint>,
-      trace: Trace,
+      trace2: Trace,
     ) => Promise<WalletFunds>,
   ) {
     const name = `${wallet.name} WalletFundsStem`;
@@ -167,7 +168,7 @@ export class BlocksStem extends Stem<number, BlockHeight> {
   readonly __brand = `BlocksStem`;
   constructor(
     utxoSource: UtxoSource,
-    sensing: (block: number, trace: Trace) => Promise<BlockHeight>,
+    sensing: (block: number, trace2: Trace) => Promise<BlockHeight>,
   ) {
     const name = `${utxoSource.name} BlocksStem`;
     super(name, sensing);

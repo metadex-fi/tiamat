@@ -2,7 +2,6 @@ import assert from "assert";
 import { Core, Kupmios } from "@blaze-cardano/sdk";
 import {
   ChainInterface,
-  Sent,
   UtxoEvent,
   UtxoEvents,
   UtxoSource,
@@ -333,17 +332,23 @@ export class SocketKupmios implements ChainInterface {
     tx: Core.Transaction, // common denominator of TxSigned (our own) and Core.TxCBOR (from the wire)
     trace: Trace,
   ): Promise<Result> => {
-    this.log("submitting to emulator");
+    this.log("submitting untipped tx");
+    const trace_ = trace.via(`${this.name}.submitUntippedTx`);
     try {
       // const txHex = Core.toHex(tx.to_bytes());
       const txId = await this.provider.postTransactionToChain(tx);
       // await this.provider.awaitTransactionConfirmation(txId); // NOTE waits for a new block (in kupmios as well) which is too slow
       this.log(`submitUntippedTx - submitted ${txId}`);
-      return new Result([`submitted ${txId}`], trace);
+      return new Result(
+        [`submitted ${txId}`],
+        this.name,
+        `submitUntippedTx`,
+        trace_,
+      );
     } catch (err) {
-      const msg = `submitUntippedTx: ERROR\n${trace.toString()}\n${err}`;
+      const msg = `submitUntippedTx: ERROR\n${trace_.toString()}\n${err}`;
       this.throw(msg);
-      return new Result([`${this.name}.submitUntippedTx: ERROR`], trace);
+      return new Result([msg], this.name, `submitUntippedTx`, trace_);
     }
   };
 
@@ -386,8 +391,9 @@ export class SocketKupmios implements ChainInterface {
   public applyTxToLedger = async (
     tx: Core.Transaction, // common denominator of TxSigned (our own) and Core.TxCBOR (from the wire)
     updateOutputs: boolean, // for tipping-tx we got ambiguity, so we don't create utxos here
-    trace: Trace,
+    trace2: Trace,
   ): Promise<Result> => {
+    const trace_ = trace2.via(`${this.name}.applyTxToLedger`);
     const destroyed = UtxoSet.empty();
     const inputs = tx.body().inputs().values();
     for (const input of inputs) {
@@ -408,7 +414,7 @@ export class SocketKupmios implements ChainInterface {
             new Core.TransactionInput(txId.txId, BigInt(index)),
             output,
           ),
-          trace,
+          trace_,
         );
       }
     }
@@ -426,13 +432,18 @@ export class SocketKupmios implements ChainInterface {
           sub.notifyUtxoEvents(
             this,
             events_,
-            trace.via(`${this.name}.applyTxToLedger.notifyUtxoEvents`),
+            trace_.via(`${this.name}.applyTxToLedger.notifyUtxoEvents`),
           ),
         );
       }
-      return new Result((await Promise.all(promises)).flat(), trace);
+      return new Result(
+        (await Promise.all(promises)).flat(),
+        this.name,
+        `applyTxToLedger`,
+        trace_,
+      );
     }
-    return new Result([], trace);
+    return new Result([], this.name, `applyTxToLedger`, trace_);
   };
 
   /**
@@ -503,7 +514,12 @@ export class SocketKupmios implements ChainInterface {
     const blockHeight = await this.getBlockHeight();
     const trace = Trace.source(`CHAIN`, `${this.name}.queryNewBlock`);
     if (blockHeight === null) {
-      return new Result(["not connected or synced"], trace);
+      return new Result(
+        ["not connected or synced"],
+        this.name,
+        `queryNewBlock`,
+        trace,
+      );
     }
     if (blockHeight !== this.blockHeight) {
       this.blockHeight = blockHeight;
@@ -511,16 +527,21 @@ export class SocketKupmios implements ChainInterface {
       this.blockSubscribers.forEach((sub) =>
         promises.push(sub.notifyNewBlock(this, blockHeight, trace)),
       );
-      return new Result((await Promise.all(promises)).flat(), trace);
+      return new Result(
+        (await Promise.all(promises)).flat(),
+        this.name,
+        `queryNewBlock`,
+        trace,
+      );
     }
-    return new Result([], trace);
+    return new Result([], this.name, `queryNewBlock`, trace);
   };
 
   /**
    *
    */
   private queryAddressUtxos = async (): Promise<Result> => {
-    const promises: Promise<void>[] = [];
+    const promises: Promise<Result[]>[] = [];
     const events = new UtxoEvents(
       [],
       Date.now(),
@@ -535,6 +556,7 @@ export class SocketKupmios implements ChainInterface {
           // this.log(`coreUtxos: ${coreUtxos.length} at ${address}`);
           const diff = utxoDiff(currentUtxos, kupoUtxos);
 
+          let catchUpResult: Result[] = [];
           const catchUpCallbacks = this.catchUpCallbacks.get(address);
           if (catchUpCallbacks) {
             const catchingUp = utxosCatchingUp(kupoUtxos, diff.created);
@@ -552,10 +574,14 @@ export class SocketKupmios implements ChainInterface {
               `CHAIN`,
               `${this.name}.queryAddressUtxos.catchUpCallbacks`,
             );
+            const catchUpPromises: Promise<Result>[] = [];
             catchUpCallbacks.forEach((cb) =>
-              cb.run(events_, `${this.name}.queryAddressUtxos`, trace),
+              catchUpPromises.push(
+                cb.run(events_, `${this.name}.queryAddressUtxos`, trace),
+              ),
             );
             this.catchUpCallbacks.delete(address);
+            catchUpResult = await Promise.all(catchUpPromises);
           }
 
           if (diff.created.size || diff.destroyed.size) {
@@ -572,6 +598,8 @@ export class SocketKupmios implements ChainInterface {
             );
             events.events.push(...this.updateLedger(diff, false));
           }
+
+          return catchUpResult;
         }),
       );
     }
@@ -579,9 +607,8 @@ export class SocketKupmios implements ChainInterface {
     // this.log(
     //   `queryAddressUtxos: ${promises.length} promises, ${this.coreUtxos.size} addresses`,
     // );
-    await Promise.all(promises);
 
-    let result: Result[] = [];
+    const result: Result[] = (await Promise.all(promises)).flat();
     if (events.events.length) {
       this.log(
         `queryAddressUtxos: ${events.events.length} events, ${this.utxoSubscribers.size} subscribers`,
@@ -594,7 +621,7 @@ export class SocketKupmios implements ChainInterface {
       for (const [sub, _] of this.utxoSubscribers) {
         promises_.push(sub.notifyUtxoEvents(this, events, trace));
       }
-      result = (await Promise.all(promises_)).flat();
+      result.push(...(await Promise.all(promises_)).flat());
     }
 
     // if (this.queryLoopActive) {
@@ -608,6 +635,8 @@ export class SocketKupmios implements ChainInterface {
     // }
     return new Result(
       result,
+      this.name,
+      `queryAddressUtxos`,
       Trace.source(`CHAIN`, `${this.name}.queryAddressUtxos`),
     );
   };

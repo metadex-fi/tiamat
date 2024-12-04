@@ -59,8 +59,8 @@ export const attemptCounterConnect = false;
 // TODO lower those below
 export const callbackTimeoutMs: number | null = 60 * slotDurationMs; // how long we wait for a callback to return before we throw an error
 export const semaphoreTimeoutMs: number | null = 60 * slotDurationMs; // how long we wait for a semaphore to be released before we throw an error
-export const errorTimeoutMs: number | null = null; //5 * slotDurationMs; // how long we wait after an error before we throw it
-export const resultPrintTimeoutMs: number | null = slotDurationMs; // how long we wait after a callback-result is created before we want to see it printed
+export const errorTimeoutMs: number | null = 5 * slotDurationMs; // how long we wait after an error before we throw it
+export const printTimeoutMs: number | null = 5 * slotDurationMs; // how long we wait after a callback-result is created before we want to see it printed
 export const maxUserMsgDelay: number | null = 20 * queryLoopTimeoutMs;
 export const maxVectorMsgDelay: number | null = null;
 

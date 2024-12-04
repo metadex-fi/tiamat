@@ -67,7 +67,6 @@ import {
 import { getEd25519KeyHashHex } from "../../utils/conversions";
 import { Effector } from "../data/effector";
 import { TiamatCortex } from "../state/tiamatCortex";
-import { trace } from "console";
 
 /**
  *
@@ -78,7 +77,7 @@ export class SocketServer<
   CT extends TiamatContract<DC, DP>,
 > {
   private static instances = new Map<string, number>();
-  private readonly name: string;
+  public readonly name: string;
 
   private readonly socketType = `server`;
   private readonly processedTxesIn: Set<Core.TransactionId> = new Set(); // sent and rejected tipped txes
@@ -314,7 +313,10 @@ export class SocketServer<
       blaze,
     );
 
-    await socketServer.myelinate([`SocketServer.newTestingInstance`]);
+    const result = await socketServer.myelinate([
+      `SocketServer.newTestingInstance`,
+    ]);
+    result.forEach((r) => r.burn().forEach((m) => socketServer.log(m)));
     return socketServer;
   }
 
@@ -362,7 +364,12 @@ export class SocketServer<
       blaze,
     );
 
-    await SocketServer.singleton.myelinate([`SocketServer.createSingleton`]);
+    const result = await SocketServer.singleton.myelinate([
+      `SocketServer.createSingleton`,
+    ]);
+    result.forEach((r) =>
+      r.burn().forEach((m) => SocketServer.singleton?.log(m)),
+    );
     return SocketServer.singleton;
   }
 
@@ -842,6 +849,8 @@ export class SocketServer<
     this.log(msg);
     return new Result(
       [msg],
+      this.name,
+      `maybeAcceptConnections`,
       Trace.source(`SOCKET`, `${this.name}.maybeAcceptConnections`),
     );
   };
@@ -850,6 +859,7 @@ export class SocketServer<
     election: ElectionData<DC, DP>,
     trace: Trace,
   ): Promise<Result> => {
+    const trace_ = trace.via(`${this.name}.updateElectionConnections`);
     this.tip = election.tiamatParams.suggested_tip;
     const firstOwnIndex = election.eligibleEVs.findIndex(
       (ev) => ev.vector.toBlaze() === this.ownPublicKeyHash,
@@ -864,8 +874,10 @@ export class SocketServer<
         `${this.name}.updateElectionConnections: deleted self from eligibleEVsValencies`,
       );
       return new Result(
-        [`${this.name}.updateElectionConnections: not eligible`],
-        trace,
+        [`updateElectionConnections: not eligible`],
+        this.name,
+        `updateElectionConnections`,
+        trace_,
       );
     } else {
       assert(
@@ -891,12 +903,14 @@ export class SocketServer<
       false,
       retryTimeoutMs,
       retryDeadlineMs,
-      trace,
+      trace_,
     );
 
     return new Result(
-      [`${this.name}.updateElectionConnections: connections updated`],
-      trace,
+      [`connections updated`],
+      this.name,
+      `updateElectionConnections`,
+      trace_,
     );
   };
 
@@ -1309,12 +1323,11 @@ export class SocketServer<
       );
       result = new Result(
         [
-          ...this.updateUserBlockSubscription(userIpPort),
-          ...(await this.updateUserAddressSubscriptions(
-            userIpPort,
-            msg.payload,
-          )),
+          await this.updateUserBlockSubscription(userIpPort),
+          await this.updateUserAddressSubscriptions(userIpPort, msg.payload),
         ],
+        this.name,
+        `receiveUserMessage`,
         Trace.source(`SOCKET`, `${this.name}.receiveUserMessage`),
       );
     } else if (msg.tag === `untipped tx`) {
@@ -1359,6 +1372,8 @@ export class SocketServer<
       this.throw(error);
       result = new Result(
         [error],
+        this.name,
+        `receiveUserMessage`,
         Trace.source(`SOCKET`, `${this.name}.receiveUserMessage`),
       );
     }
@@ -1432,6 +1447,8 @@ export class SocketServer<
       this.throw(error);
       result = new Result(
         [error],
+        this.name,
+        `receiveVectorMessage`,
         Trace.source(`SOCKET`, `${this.name}.receiveVectorMessage`),
       );
     }
@@ -1443,14 +1460,25 @@ export class SocketServer<
    *
    * @param userIpPort
    */
-  private updateUserBlockSubscription = (userIpPort: IpPort): string[] => {
+  private updateUserBlockSubscription = async (
+    userIpPort: IpPort,
+  ): Promise<Result> => {
     const user = `${userIpPort.ip}:${userIpPort.port}`;
+    const trace = Trace.source(
+      `SOCKET`,
+      `${this.name}.updateUserBlockSubscription(${user})`,
+    );
     if (this.userBlockSubscriptions.has(user)) {
-      return [`${user} already subscribed to new blocks`];
+      return new Result(
+        [`${user} already subscribed to new blocks`],
+        this.name,
+        `updateUserBlockSubscription`,
+        trace,
+      );
     }
     this.userBlockSubscriptions.add(user);
 
-    this.utxoSource.subscribeToNewBlock(
+    const result = await this.utxoSource.subscribeToNewBlock(
       this,
       new Callback(
         `always`,
@@ -1480,7 +1508,12 @@ export class SocketServer<
       ),
     );
 
-    return [`updated block subscriptions for ${user}`];
+    return new Result(
+      [result, `updated block subscriptions for ${user}`],
+      this.name,
+      `updateUserBlockSubscription`,
+      trace,
+    );
   };
 
   // TODO removing subscriptions when socket closed
@@ -1492,7 +1525,7 @@ export class SocketServer<
   private updateUserAddressSubscriptions = async (
     userIpPort: IpPort,
     newAddresses: string[],
-  ): Promise<string[]> => {
+  ): Promise<Result> => {
     const user = `${userIpPort.ip}:${userIpPort.port}`;
     let subscriptions = this.userAddressSubscriptions.get(user);
     if (!subscriptions) {
@@ -1587,7 +1620,12 @@ export class SocketServer<
 
     subscriptions.discharge(newAddressSet, id_);
 
-    return [`updated subscriptions for ${user}`];
+    return new Result(
+      [`updated subscriptions for ${user}`],
+      this.name,
+      `updateUserAddressSubscriptions`,
+      Trace.source(`SOCKET`, `${this.name}.updateUserAddressSubscriptions`),
+    );
   };
 
   /**
@@ -1627,22 +1665,24 @@ export class SocketServer<
     trace: Trace,
   ): Promise<Result> => {
     // TODO catch and handle errors
+    const trace_ = trace.via(`${this.name}.recordTippedTx`);
     const txId = tx.toCore().id;
     if (this.recordedTxs.has(txId)) {
       if (this.recordedTxs.size > recordedTxCacheSize) {
         this.recordedTxs.clear();
       }
-      return new Result([`tx already recorded`], trace);
+      return new Result(
+        [`tx already recorded`],
+        this.name,
+        `recordTippedTx`,
+        trace_,
+      );
     } else {
       this.recordedTxs.add(txId);
       const utxosID = await this.socketKupmios.latchUtxoSemaphore(
         `${this.name}.recordTippedTx`,
       );
-      const result = await this.socketKupmios.applyTxToLedger(
-        tx,
-        true,
-        trace.via(`${this.name}.recordTippedTx`),
-      );
+      const result = await this.socketKupmios.applyTxToLedger(tx, true, trace_);
       this.socketKupmios.dischargeUtxoSemaphore(utxosID);
       return result;
     }
@@ -1682,6 +1722,7 @@ export class SocketServer<
     tx: TippedTxCBOR,
     trace: Trace,
   ): Promise<Result> => {
+    const trace_ = trace.via(`${this.name}.processTippedTx`);
     /**
      *
      * @param msg
@@ -1692,7 +1733,7 @@ export class SocketServer<
       } else {
         this.throw(msg);
       }
-      return new Result([msg], trace);
+      return new Result([msg], this.name, `processTippedTx`, trace_);
     };
 
     // parse tx
@@ -1755,15 +1796,17 @@ export class SocketServer<
           await this.submitTxToChain(
             signedPayloadTx,
             true,
-            trace.via(`${this.name}.processTippedTx (1/2)`),
+            trace_.via(`${this.name}.processTippedTx (1/2)`),
           ),
           await this.submitTxToChain(
             parsedTx.signedTippingTx,
             false,
-            trace.via(`${this.name}.processTippedTx (2/2)`),
+            trace_.via(`${this.name}.processTippedTx (2/2)`),
           ),
         ],
-        trace,
+        this.name,
+        `processTippedTx`,
+        trace_,
       );
     } else {
       this.log(`sending tipped tx to peers`);
@@ -1792,7 +1835,12 @@ export class SocketServer<
         ws.send(msg_);
       });
       this.vectorPeerSockets.discharge(id);
-      result = new Result([`sent tipped tx to peers`], trace);
+      result = new Result(
+        [`sent tipped tx to peers`],
+        this.name,
+        `processTippedTx`,
+        trace_,
+      );
     }
     return result;
   };
@@ -1807,6 +1855,7 @@ export class SocketServer<
     trace: Trace,
   ): Promise<Result> => {
     this.log(`processElectionTx`);
+    const trace_ = trace.via(`${this.name}.processElectionTx`);
     /**
      *
      * @param msg
@@ -1817,7 +1866,7 @@ export class SocketServer<
       } else {
         this.throw(msg);
       }
-      return new Result([msg], trace);
+      return new Result([msg], this.name, `processElectionTx`, trace_);
     };
     // parse tx
     const parsedTx = parseElectionTx(tx);
@@ -1874,11 +1923,7 @@ export class SocketServer<
         newWitnessSet,
         parsedTx.partiallySignedElectionTx.auxiliaryData(),
       );
-      result = await this.submitTxToChain(
-        signedElectionTx,
-        true,
-        trace.via(`${this.name}.processElectionTx`),
-      );
+      result = await this.submitTxToChain(signedElectionTx, true, trace_);
     } else {
       this.log(`sending election-tx to peers`);
       const updatedTx: ElectionTxCBOR = {
@@ -1904,7 +1949,12 @@ export class SocketServer<
         ws.send(msg_);
       });
       this.vectorPeerSockets.discharge(id);
-      result = new Result([`sent election-tx to peers`], trace);
+      result = new Result(
+        [`sent election-tx to peers`],
+        this.name,
+        `processElectionTx`,
+        trace_,
+      );
     }
 
     return result;
@@ -1922,6 +1972,7 @@ export class SocketServer<
     trace: Trace,
   ): Promise<Result> => {
     this.log(`submitting via socketServer`);
+    const trace_ = trace.via(`${this.name}.submitTxToChain`);
 
     const result: (Result | string | Sent)[] = [];
     this.recordedTxs.add(tx.toCore().id);
@@ -1930,22 +1981,13 @@ export class SocketServer<
       `${this.name}.submitTxToChain`,
     );
 
-    result.push(
-      await this.socketKupmios.submitUntippedTx(
-        tx,
-        trace.via(`${this.name}.submitTxToChain`),
-      ),
-    );
+    result.push(await this.socketKupmios.submitUntippedTx(tx, trace_));
     await this.informOtherVectorsAboutTx(tx);
     result.push(
-      await this.socketKupmios.applyTxToLedger(
-        tx,
-        updateLocalOutputs,
-        trace.via(`${this.name}.submitTxToChain.socketKupmios.applyTxToLedger`),
-      ),
+      await this.socketKupmios.applyTxToLedger(tx, updateLocalOutputs, trace_),
     );
     this.socketKupmios.dischargeUtxoSemaphore(utxosID);
-    return new Result(result, trace);
+    return new Result(result, this.name, `submitTxToChain`, trace_);
   };
 
   /**
@@ -1970,7 +2012,7 @@ export class SocketServer<
   /**
    *
    * @param matrix
-   * @param trace
+   * @param trace_
    */
   private syncEigenValue = async (
     matrix: MatrixUtxo,
@@ -1978,6 +2020,7 @@ export class SocketServer<
   ): Promise<Result> => {
     this.log(`syncEigenValue`);
     assert(matrix.svmDatum, `${this.name}: no svmDatum in matrix utxo`);
+    const trace_ = trace.via(`${this.name}.syncEigenValue`);
     const eigenValues = matrix.svmDatum.state.eigen_values;
     const eigenwert = matrix.svmDatum.config.eigenwert;
     let firstTx: TxCompleat | undefined;
@@ -1989,12 +2032,17 @@ export class SocketServer<
       nexusUtxo = this.contract.nexus.singleton.utxo;
     } catch (err) {
       this.log(err as string);
-      return new Result([`syncEigenValue: nexus not found`], trace);
+      return new Result(
+        [`syncEigenValue: nexus not found`],
+        this.name,
+        `syncEigenValue`,
+        trace_,
+      );
     }
 
     const utxos = await UtxoSet.ofWallet(this.blaze.wallet);
     if (utxos.size === 0) {
-      return new Result([`no utxos`], trace);
+      return new Result([`no utxos`], this.name, `syncEigenValue`, trace_);
     }
 
     const ownEigenValue = eigenValues.find(
@@ -2035,7 +2083,9 @@ export class SocketServer<
       } else {
         return new Result(
           [`not registered and no desire to be registered`],
-          trace,
+          this.name,
+          `syncEigenValue`,
+          trace_,
         );
       }
     } else if (this.targetStake === 0n) {
@@ -2124,12 +2174,12 @@ export class SocketServer<
           await this.contract.submitUntippedTx(
             signedTxes[0],
             // mkAckCallback(0, 2),
-            trace.via(`${this.name}.syncEigenValue (1/2)`),
+            trace_.via(`${this.name}.syncEigenValue (1/2)`),
           ),
           await this.contract.submitUntippedTx(
             signedTxes[1],
             // mkAckCallback(1, 2),
-            trace.via(`${this.name}.syncEigenValue (2/2)`),
+            trace_.via(`${this.name}.syncEigenValue (2/2)`),
           ),
         ];
         // } catch (e) {
@@ -2147,7 +2197,7 @@ export class SocketServer<
           await this.contract.submitUntippedTx(
             txSigned,
             // mkAckCallback(0, 1),
-            trace.via(`${this.name}.syncEigenValue`),
+            trace_.via(`${this.name}.syncEigenValue`),
           ),
         ];
         // } catch (e) {
@@ -2158,7 +2208,7 @@ export class SocketServer<
       // await redLight;
     }
 
-    return new Result(return_, trace);
+    return new Result(return_, this.name, `syncEigenValue`, trace_);
   };
 
   /**

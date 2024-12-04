@@ -110,11 +110,11 @@ export interface ChainInterface {
   ) => void;
   subscribeToNewBlock: (subscriber: UtxoSource) => void;
   // subscribeToAck: (subscriber: UtxoSource) => void;
-  submitUntippedTx: (tx: Core.Transaction, trace: Trace) => Promise<Result>;
-  submitTippedTxes: (txes: CliqueTippedTx[], trace: Trace) => Promise<Result>;
+  submitUntippedTx: (tx: Core.Transaction, trace2: Trace) => Promise<Result>;
+  submitTippedTxes: (txes: CliqueTippedTx[], trace2: Trace) => Promise<Result>;
   submitElectionTxes: (
     txes: CliqueElectionTx[],
-    trace: Trace,
+    trace2: Trace,
   ) => Promise<Result>;
 }
 
@@ -324,13 +324,13 @@ export class UtxoSource {
         });
         if (msgs.length === 0) return [];
         else {
-          return (
+          return [
             await callback.run(
               JSON.stringify(msgs),
               `${this.name}.subscribeToAddressMsgs`,
               trace,
-            )
-          ).burn();
+            ),
+          ];
         }
       },
     );
@@ -382,10 +382,18 @@ export class UtxoSource {
       `${this.name}.subscribeToAddress: subscriber neither TiamatSvm nor Wallet nor BlocksStem nor SocketServer`,
     );
     this.newBlockCallbacks.push(callback);
-    const trace = Trace.source(`SUB`, `${this.name}.subscribeToNewBlock`);
+
     if (this.subscribedToNewBlock)
       return Promise.resolve(
-        new Result([`${this.name}: already subscribed to new block`], trace),
+        new Result(
+          [`already subscribed to new block`],
+          this.name,
+          `subscribeToNewBlock`,
+          Trace.source(
+            `SUB`,
+            `${this.name}.subscribeToNewBlock from ${subscriber.name} (already subscribed)`,
+          ),
+        ),
       );
 
     this.subscribedToNewBlock = true;
@@ -395,7 +403,15 @@ export class UtxoSource {
     );
     this.chainInterface.subscribeToNewBlock(this);
     return Promise.resolve(
-      new Result([`${this.name}: successfully subscribed to new block`], trace),
+      new Result(
+        [`successfully subscribed to new block`],
+        this.name,
+        `subscribeToNewBlock`,
+        Trace.source(
+          `SUB`,
+          `${this.name}.subscribeToNewBlock from ${subscriber.name} (new subscription)`,
+        ),
+      ),
     );
   };
 
@@ -417,7 +433,7 @@ export class UtxoSource {
    *
    * @param from
    * @param events
-   * @param trace
+   * @param trace_
    */
   public notifyUtxoEvents = async (
     from: ChainInterface | this,
@@ -428,6 +444,7 @@ export class UtxoSource {
       from === this.chainInterface || from === this,
       `${this.name}: notifyUtxoEvents from wrong chainInterface`,
     );
+    const trace_ = trace.via(`${this.name}.notifyUtxoEvents`);
     const promises: Promise<Result>[] = [];
     // const result: string[] = [];
 
@@ -473,7 +490,7 @@ export class UtxoSource {
       // }
       callbacks.forEach((callback) =>
         promises.push(
-          callback.run(events_, `${this.name}.notifyUtxoEvents`, trace),
+          callback.run(events_, `${this.name}.notifyUtxoEvents`, trace_),
         ),
       );
     }
@@ -518,24 +535,25 @@ export class UtxoSource {
       const callback = this.idMsgsCallbacks.get(id);
       assert(callback, `${this.name}:.no callback`);
       // result.push(...(await callback.run(msg)));
-      promises.push(callback.run(msg, `${this.name}.notifyUtxoEvents`, trace));
+      promises.push(callback.run(msg, `${this.name}.notifyUtxoEvents`, trace_));
     }
     const result = (await Promise.all(promises)).flat(); // TODO what about this?
     // result.push(...(await Promise.all(promises)).flat());
     this.log(`notifyUtxoEvents ${id_}:`, result.length, `results`);
-    return new Result(result, trace);
+    return new Result(result, this.name, `notifyUtxoEvents`, trace_);
   };
 
   /**
    *
    * @param utxos
-   * @param trace
+   * @param trace_
    */
   public initialNotifyUtxoEvents = async (
     utxos: UtxoSet,
     trace: Trace,
   ): Promise<Result> => {
     this.log(`INITIAL NOTIFY`);
+    const trace_ = trace.via(`${this.name}.initialNotifyUtxoEvents`);
     // this.initialUtxos = utxos;
     const promises: Promise<Result>[] = [];
     this.addressCallbacks.forEach((callbacks, address) => {
@@ -562,20 +580,25 @@ export class UtxoSource {
             callback.run(
               events_,
               `${this.name}.initialNotifyUtxoEvents.${concise}`,
-              trace,
+              trace_,
             ),
           ),
         );
       }
     });
-    return new Result((await Promise.all(promises)).flat(), trace);
+    return new Result(
+      (await Promise.all(promises)).flat(),
+      this.name,
+      `initialNotifyUtxoEvents`,
+      trace_,
+    );
   };
 
   /**
    *
    * @param from
    * @param block
-   * @param trace
+   * @param trace_
    */
   public notifyNewBlock = async (
     from: ChainInterface,
@@ -586,16 +609,22 @@ export class UtxoSource {
       from === this.chainInterface,
       `${this.name}: notifyNewBlock from wrong chainInterface`,
     );
+    const trace_ = trace.via(`${this.name}.notifyNewBlock`);
     const promises = this.newBlockCallbacks.map((callback) =>
-      callback.run(block, `${this.name}.notifyNewBlock`, trace),
+      callback.run(block, `${this.name}.notifyNewBlock`, trace_),
     );
-    return new Result((await Promise.all(promises)).flat(), trace);
+    return new Result(
+      (await Promise.all(promises)).flat(),
+      this.name,
+      `initalNotifyUtxoEvents`,
+      trace_,
+    );
   };
 
   // public notifyAck = async (
   //   from: ChainInterface,
   //   txId: TxId,
-  //   trace: Trace,
+  //   trace2: Trace,
   // ): Promise<Result> => {
   //   // throw new Error(
   //   //   `TODO FIXME (the Acks should be not all in one indiscriminate bag but per utxo/svm)`,
@@ -623,7 +652,7 @@ export class UtxoSource {
    *
    * @param tx
    * @param spentSvms
-   * @param trace
+   * @param trace_
    */
   public submitUntippedTx = async (
     tx: TxSigned,
@@ -636,6 +665,7 @@ export class UtxoSource {
       this.chainInterface,
       `${this.name}: no socketClient in dummy UtxoSource`,
     );
+    const trace_ = trace.via(`${this.name}.submitUntippedTx`);
     // const txId = TxId.fromCoreBody(tx.txSigned.body());
     // const ackCallbacks = this.ackCallbacks.get(txId);
     // if (ackCallbacks) {
@@ -644,13 +674,13 @@ export class UtxoSource {
     //   this.ackCallbacks.set(txId, [ackCallback]);
     // }
     try {
-      return await this.chainInterface.submitUntippedTx(tx.tx, trace);
+      return await this.chainInterface.submitUntippedTx(tx.tx, trace_);
     } catch (e) {
       const msg = `untipped tx submission error: ${e}`;
       if (!handleTxSubmissionErrors) {
         this.throw(msg);
       }
-      return new Result([msg], trace);
+      return new Result([msg], this.name, `submitUntippedTx`, trace_);
     }
   };
 
@@ -658,7 +688,7 @@ export class UtxoSource {
    *
    * @param txes
    * @param spentSvms
-   * @param trace
+   * @param trace_
    */
   public submitTippedTxes = async (
     txes: CliqueTippedTx[],
@@ -670,6 +700,7 @@ export class UtxoSource {
       this.chainInterface,
       `${this.name}: no socketClient in dummy UtxoSource`,
     );
+    const trace_ = trace.via(`${this.name}.submitTippedTxes`);
     // for (const tx of txes) {
     //   const vkeys = tx.tx.partiallySignedPayloadTx.witnessSet().vkeys()?.values();
     //   assert(vkeys, `submitTippedTxes: no vkeys in tipped tx`);
@@ -679,13 +710,13 @@ export class UtxoSource {
     //   }
     // }
     try {
-      return await this.chainInterface.submitTippedTxes(txes, trace);
+      return await this.chainInterface.submitTippedTxes(txes, trace_);
     } catch (e) {
       const msg = `tipped tx submission error: ${e}`;
       if (!handleTxSubmissionErrors) {
         this.throw(msg);
       }
-      return new Result([msg], trace);
+      return new Result([msg], this.name, `submitTippedTxes`, trace_);
     }
   };
 
@@ -693,18 +724,19 @@ export class UtxoSource {
    *
    * @param txes
    * @param spentSvms
-   * @param trace
+   * @param trace_
    */
   public submitElectionTxes = async (
     txes: CliqueElectionTx[],
     trace: Trace,
   ): Promise<Result> => {
     this.log(`submitElectionTxes`);
+    const trace_ = trace.via(`${this.name}.submitElectionTxes`);
     const errorTimeout = new ErrorTimeout(
       this.name,
       `submitElectionTxes`,
       callbackTimeoutMs! / 2,
-      trace.via(`${this.name}.submitElectionTxes`),
+      trace_.via(`${this.name}.submitElectionTxes`),
     );
     assert(
       this.chainInterface,
@@ -722,7 +754,7 @@ export class UtxoSource {
     //   }
     // }
     try {
-      const result = await this.chainInterface.submitElectionTxes(txes, trace);
+      const result = await this.chainInterface.submitElectionTxes(txes, trace_);
       errorTimeout.clear();
       return result;
     } catch (e) {
@@ -730,7 +762,7 @@ export class UtxoSource {
       if (!handleTxSubmissionErrors) {
         this.throw(msg);
       }
-      return new Result([msg], trace);
+      return new Result([msg], this.name, `submitElectionTxes`, trace_);
     }
   };
 

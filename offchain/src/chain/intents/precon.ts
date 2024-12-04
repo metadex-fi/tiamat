@@ -30,7 +30,7 @@ export interface FixFoldPhase<
   readonly divergentFixSubmit?: (
     fixingTx: Tx,
     contract: TiamatContract<DC, DP>,
-    trace: Trace,
+    trace2: Trace,
   ) => Promise<{
     fixTxCompleat: TxCompleat; // for chaining the action-tx
     submitFixTx: () => Promise<Result>;
@@ -68,7 +68,7 @@ export abstract class Precon<
     private readonly mkDivergentFixSubmit?: (prior: PriorT) => (
       fixingTx: Tx,
       contract: TiamatContract<DC, DP>,
-      trace: Trace,
+      trace2: Trace,
     ) => Promise<{
       fixTxCompleat: TxCompleat; // for chaining the action-tx
       submitFixTx: () => Promise<Result>;

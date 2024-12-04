@@ -16,6 +16,10 @@ export class Effector<InZT extends Zygote> {
     from: string,
     trace: Trace,
   ): Promise<Result> => {
-    return await this.effect.run(zygote, from, trace);
+    return await this.effect.run(
+      zygote,
+      from,
+      trace.via(`${this.name}.induce from ${from}`),
+    );
   };
 }

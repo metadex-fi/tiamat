@@ -147,7 +147,12 @@ export class SocketClient implements ChainInterface {
     const newVectorIpPorts = [...this.vectorData.keys()];
     this.updateVectorConnections(newVectorIpPorts);
     return await Promise.resolve(
-      new Result([`${this.name}: connections updated`], trace),
+      new Result(
+        [`connections updated`],
+        this.name,
+        `updateConnections`,
+        trace.via(`${this.name}.updateConnections`),
+      ),
     );
   };
 
@@ -231,7 +236,12 @@ export class SocketClient implements ChainInterface {
       tag: `untipped tx`,
     };
     const msg_ = JSON.stringify(msg);
-    return new Result([await this.submitTxesMsg(msg_, `all`), sent], trace);
+    return new Result(
+      [await this.submitTxesMsg(msg_, `all`), sent],
+      this.name,
+      `submitUntippedTx`,
+      trace.via(`${this.name}.submitUntippedTx`),
+    );
   };
 
   /**
@@ -254,7 +264,12 @@ export class SocketClient implements ChainInterface {
       const result = await this.submitTxesMsg(msg_, tx.supportVectorSet);
       return [result, sent];
     });
-    return new Result((await Promise.all(promises)).flat(), trace);
+    return new Result(
+      (await Promise.all(promises)).flat(),
+      this.name,
+      `submitTippedTxes`,
+      trace.via(`${this.name}.submitTippedTxes`),
+    );
   };
 
   /**
@@ -277,7 +292,12 @@ export class SocketClient implements ChainInterface {
       const result = await this.submitTxesMsg(msg_, tx.supportVectorSet);
       return [result, sent];
     });
-    return new Result((await Promise.all(promises)).flat(), trace);
+    return new Result(
+      (await Promise.all(promises)).flat(),
+      this.name,
+      `ubmitElectionTxes`,
+      trace.via(`${this.name}.submitElectionTxes`),
+    );
   };
 
   //////////////////////////////////////////
@@ -486,7 +506,12 @@ export class SocketClient implements ChainInterface {
     }
     const trace = Trace.source(`SOCKET`, `${this.name}.receiveVectorMessage`);
     if (this.processedMsgsIn.has(data)) {
-      return new Result([`already processed ${data}`], trace);
+      return new Result(
+        [`already processed ${data}`],
+        this.name,
+        `receiveVectorMessage`,
+        trace,
+      );
     }
 
     let count = this.getVectorValency(vectorIpPort);
@@ -498,7 +523,12 @@ export class SocketClient implements ChainInterface {
         `not elected anymore`,
       );
       this.throw(`this should not happen`);
-      return new Result([`this should not happen`], trace);
+      return new Result(
+        [`this should not happen`],
+        this.name,
+        `receiveVectorMessage`,
+        trace,
+      );
     } else {
       const confirmations = this.pendingMsgsIn.get(data);
       const by = confirmations?.by ?? new Set();
@@ -511,6 +541,8 @@ export class SocketClient implements ChainInterface {
         if (by.has(vectorKeyHash.concise())) {
           return new Result(
             [`already confirmed by ${vectorKeyHash}: ${data}`],
+            this.name,
+            `receiveVectorMessage`,
             trace,
           );
         } else {
@@ -529,6 +561,8 @@ export class SocketClient implements ChainInterface {
         this.pendingMsgsIn.set(data, confirmations_);
         return new Result(
           [`${count}/${requiredConfirmations} confirmations for ${data}`],
+          this.name,
+          `receiveVectorMessage`,
           trace,
         );
       }
@@ -656,6 +690,8 @@ export class SocketClient implements ChainInterface {
 
     return new Result(
       (await Promise.all(promises)).flat(),
+      this.name,
+      `processVectorMessage`,
       Trace.source(`SOCKET`, `${this.name}.processVectorMessage`),
     );
   };
