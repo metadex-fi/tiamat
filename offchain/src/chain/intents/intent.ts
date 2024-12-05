@@ -30,12 +30,12 @@ export abstract class Intent<
   ChoicesT extends Zygote,
   StatusT extends Zygote,
 > {
-  public readonly name: string;
   private conflux: Conflux<ChoicesT, StatusT>; // user choices & feedback to user from relevant chain state
   private status: `choosing` | `pending` | `success` | `failure` | `retrying` =
     `choosing`;
 
   constructor(
+    public readonly name: string,
     private readonly user: TiamatUser<DC, DP, CT>, // TODO better type
     chainGanglion: Ganglion<any, StatusT>, // The "summary" of all chain updates
     private readonly mkDefaultChoices: () => ChoicesT,
@@ -60,7 +60,6 @@ export abstract class Intent<
       trace2: Trace,
     ) => Promise<Result>, // construct action-tx, add tips (if applicable), compleat, sign, submit, etc.
   ) {
-    this.name = `${user.name} Intent`;
     this.conflux = this.mkConflux(mkDefaultChoices(), defaultStatus);
     const effect = new Callback(
       `always`,
@@ -108,7 +107,9 @@ export abstract class Intent<
     this.updateDisplay(this.conflux, this.status);
 
     // for blocking during election-margins
+    this.log(`latching action semaphore`);
     const actionId = await this.user.actionSemaphore.latch(this.name);
+    this.log(`discharging action semaphore`);
     this.user.actionSemaphore.discharge(actionId);
 
     let fix: FixFoldPhase<DC, DP> = {
@@ -122,6 +123,7 @@ export abstract class Intent<
     this.precons.forEach((precon) => {
       fix = precon.fixFold(fix, this.fixTxAckCallback);
     });
+    this.log(`${this.name} fixWallet: ${fix.fixWallet}`);
     let fixTx: Tx | null = null;
     switch (fix.fixWallet) {
       case `ok`:
@@ -151,7 +153,7 @@ export abstract class Intent<
     };
     const actionAckCallbackFn = async (
       txId: TxId,
-      trace2: Trace,
+      trace: Trace,
     ): Promise<[Result]> => {
       this.log(`actionAckCallbackFn: received ACK:\n <~~`, txId.txId);
       const result = new Result(

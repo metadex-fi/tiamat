@@ -72,7 +72,13 @@ export class ServitorPrecon<
     // check if servitor has enough ADA for at least one action- and tipping-tx.
     // TODO could reduce this to 1 for unhinged txes.
     const isMetBy = (prior: WalletsFundsStatus): boolean => {
-      return prior.servitorADA >= minNumTxFees * txFees;
+      const isMet = prior.servitorADA >= minNumTxFees * txFees;
+      if (isMet) {
+        console.log(`${name} is met by ${prior.show()}`);
+      } else {
+        console.log(`${name} is not met by ${prior.show()}`);
+      }
+      return isMet;
     };
 
     // funds to fund the servitor-wallet come from the owner-wallet, naturally.

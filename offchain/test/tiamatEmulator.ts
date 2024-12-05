@@ -422,13 +422,6 @@ export class TiamatEmulator<
           this.emulatorParams.numInitialBlocks,
         );
 
-        waitingSlots = 0;
-        for (let i = this.emulatorParams.numBlocksPerCycle; i >= 0; i--) {
-          console.log(`${i}..`);
-          await emulator.awaitNextBlock();
-          waitingSlots += slotsPerBlock;
-        }
-
         console.log(`GENERATING USERS\n`);
         // generate users
         const users: UT[] = [];

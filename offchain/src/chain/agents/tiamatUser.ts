@@ -407,6 +407,7 @@ export abstract class TiamatUser<
           [`${this.name}`, `unlockAfterMargins`],
           (_data: BlockHeight, _trace: Trace) => {
             if (this.marginLockIds) {
+              this.log(`discharging margin semaphores`);
               this.lockSemaphore.discharge(this.marginLockIds.lockId);
               this.actionSemaphore.discharge(this.marginLockIds.actionId);
               this.marginLockIds = undefined;
@@ -444,14 +445,12 @@ export abstract class TiamatUser<
     _election: ElectionData<DC, DP>,
     trace: Trace,
   ): Promise<Result> => {
-    assert(
-      !this.marginLockIds,
-      `${this.name}.lockDuringMargins: margin lock already latched`,
-    );
+    await new Promise((resolve) => setTimeout(resolve, 0)); // NOTE/TODO to queue in major event loop
     let result: string;
     if (this.lockSemaphore.busy) {
       result = `lockDuringMargins: lockSemaphore busy, skipping double lock`;
     } else {
+      this.log(`latching margin sempahores`);
       const lockId = this.lockSemaphore.latch(
         `lockDuringMargins`,
         `no timeout`,
