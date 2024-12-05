@@ -22,12 +22,11 @@ export class ServitorPreconPlexus<
   DP extends PDappParamsT,
   CT extends TiamatContract<DC, DP>,
 > extends Plexus {
-  private readonly walletsFundsGanglion: WalletsFundsGanglion;
+  public readonly walletsFundsGanglion: WalletsFundsGanglion;
   public readonly servitorPrecon: ServitorPrecon<DC, DP>;
 
   constructor(
     user: TiamatUser<DC, DP, CT>,
-    numTxFees: bigint,
     private readonly servitorFundsPlexus: WalletFundsPlexus,
     private readonly ownerFundsPlexus: WalletFundsPlexus,
   ) {
@@ -76,7 +75,6 @@ export class ServitorPreconPlexus<
       user.name,
       this.walletsFundsGanglion,
       user.servitorAddress,
-      numTxFees,
     );
   }
 

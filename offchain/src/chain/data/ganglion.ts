@@ -1,11 +1,16 @@
 import assert from "assert";
-import { blockDurationMs, errorTimeoutMs } from "../../utils/constants";
+import {
+  blockDurationMs,
+  errorTimeoutMs,
+  logGanglionStateChange,
+} from "../../utils/constants";
 import { Zygote } from "./zygote";
 import { Effector } from "./effector";
 import { Trace } from "../../utils/wrappers";
 import { ErrorTimeout } from "../../utils/errorTimeout";
 import { Simplephore } from "../agents/semaphore";
 import { Result } from "../state/callback";
+import { t } from "../../types/general/fundamental/type";
 
 /**
  * A node in the data processing pipeline.
@@ -185,7 +190,18 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
           if (this.current !== `virginal` && this.current.equals(newState)) {
             this.log(`No change in state`);
           } else {
-            this.log(`State changed:\n`, this.current, `\n\t⬇\n`, newState);
+            if (logGanglionStateChange) {
+              const current_ =
+                this.current === `virginal` ? `virginal` : this.current.show(t);
+              this.log(
+                `State changed:\n`,
+                current_,
+                `\n\t⬇\n`,
+                newState.show(t),
+              );
+            } else {
+              this.log(`State changed`);
+            }
             this.current = newState;
             const result_ = await this.induceEfferents(newState, trace_);
             result.push(...result_);

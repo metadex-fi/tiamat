@@ -22,8 +22,8 @@ export class TiamatCortex<
 
   constructor(name: string, contract: ContractT) {
     this.name = `${name} TiamatCortex`;
-    this.nexusPlexus = new SvmSingletonPlexus(contract.nexus);
-    this.matrixPlexus = new SvmSingletonPlexus(contract.matrix);
+    this.nexusPlexus = new SvmSingletonPlexus(contract.nexus, 1);
+    this.matrixPlexus = new SvmSingletonPlexus(contract.matrix, 1);
     this.blocksPlexus = new BlocksPlexus(contract.utxoSource);
 
     this.electionsPlexus = new ElectionsPlexus(

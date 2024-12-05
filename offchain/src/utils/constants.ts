@@ -1,3 +1,5 @@
+import assert from "assert";
+
 export const maxInteger = BigInt(
   // TODO better value, maybe look at chain/plutus max
   Number.MAX_SAFE_INTEGER, // = 2 ** 53 - 1
@@ -26,7 +28,12 @@ export const assertWithinMargin = false; // TODO fix this (medium priority)
 export const lovelacePerAda = 1000000n;
 export const txFees = 5n * lovelacePerAda; // costs in lovelace for fees and collateral. TODO wild guess and probably overestimate
 export const lockedLovelace = 25n * lovelacePerAda; // ada required in a utxo.  TODO wild guess and probably overestimate
-export const numTxFees = 10n; // how many txes we pre-fund. TODO shouldn't be a constant
+export const prefundNumTxFees = 10n; // how many txes we pre-fund. TODO shouldn't be a constant
+export const minNumTxFees = 2n; // how many txes we pre-fund.
+assert(
+  prefundNumTxFees >= minNumTxFees,
+  `numTxFees must be able to pay for at least one action- and fixing-tx in the current setup. This would be less for unhinged txes, but we will address that later. See ServitorPrecon for more.`,
+);
 
 export const kupoUrl = "http(s)://localhost:1442"; // TODO placeholder
 export const ogmiosUrl = "ws(s)://localhost:1337"; // TODO placeholder
@@ -46,12 +53,12 @@ export const vestingMarginMs = 2 * blockDurationMs; // how long from now the ves
 
 // verbosity
 export const logElection = true;
-export const logRegistered = true;
+export const logRegistered = false;
 export const logSimplephore = false;
 export const logCallbacks = true;
 export const logCallbackFns = false;
 export const logUtxoEvents = true;
-export const logOptions = true;
+export const logGanglionStateChange = true;
 
 export const attemptCounterConnect = false;
 // export const simulatedPubSubMaxDelay = slotDurationMs / 2;

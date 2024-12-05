@@ -322,32 +322,40 @@ export class Wallet {
 
   private processEventFunds = (event: UtxoEvent) => {
     const value = event.utxo.output().amount();
-    const assets = value.multiasset();
-    if (assets) {
-      for (const [asset, delta] of assets) {
-        // if (asset.startsWith(lpTokenCurrency)) {
-        //   this.log(`subscribeToOwnerFunds: ignoring lp-token`); // TODO handle this
-        //   continue;
-        // }
-        const balance = this.funds.get(asset) ?? 0n;
-        if (event.type === `create`) {
-          const newBalance = balance + delta;
-          this.funds.set(asset, newBalance);
-        } else {
-          assert(
-            balance >= delta,
-            `${this.name} - subscribeToOwnerFunds: negative balance: ${
-              balance - delta
-            }`,
-          );
-          const newBalance = balance - delta;
-          assert(
-            newBalance >= 0n,
-            `${this.name} - subscribeToOwnerFunds: negative balance: ${newBalance}`,
-          );
-          if (newBalance) this.funds.set(asset, newBalance);
-          else this.funds.delete(asset);
-        }
+    const assets = value.multiasset() ?? new Map<Core.AssetId, bigint>();
+    assert(!assets.has(`` as Core.AssetId), `unexpected ADA in multiasset`);
+    assets.set(`` as Core.AssetId, value.coin());
+    for (const [asset, delta] of assets) {
+      // if (asset.startsWith(lpTokenCurrency)) {
+      //   this.log(`subscribeToOwnerFunds: ignoring lp-token`); // TODO handle this
+      //   continue;
+      // }
+      const shortAsset =
+        asset.length < 8 ? asset : `${asset.slice(0, 4)}...${asset.slice(-4)}`;
+      const balance = this.funds.get(asset) ?? 0n;
+      if (event.type === `create`) {
+        const newBalance = balance + delta;
+        this.funds.set(asset, newBalance);
+        this.log(
+          `processEventFunds: ${shortAsset} ${balance} + ${delta} = ${newBalance}`,
+        );
+      } else {
+        assert(
+          balance >= delta,
+          `${this.name} - subscribeToOwnerFunds: negative balance: ${
+            balance - delta
+          }`,
+        );
+        const newBalance = balance - delta;
+        this.log(
+          `processEventFunds: ${shortAsset} ${balance} - ${delta} = ${newBalance}`,
+        );
+        assert(
+          newBalance >= 0n,
+          `${this.name} - subscribeToOwnerFunds: negative balance: ${newBalance}`,
+        );
+        if (newBalance) this.funds.set(asset, newBalance);
+        else this.funds.delete(asset);
       }
     }
   };

@@ -14,7 +14,7 @@ import {
   logRegistered,
   blockDurationMs,
 } from "../../utils/constants";
-import { PLifted } from "../../types/general/fundamental/type";
+import { f, PLifted } from "../../types/general/fundamental/type";
 import { Core } from "@blaze-cardano/sdk";
 import { MatrixUtxo, NexusUtxo } from "./tiamatSvmUtxo";
 import blake from "blakejs";
@@ -274,6 +274,11 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
     } else {
       return false;
     }
+  };
+
+  public show = (tabs = ``): string => {
+    const tf = `${tabs}${f}`;
+    return `ElectionData:\n${tf}${this.name}\n${tf}${this.seed}\n${tf}${this.matrixUtxoString}\n${tf}${this.fromMs}\n${tf}${this.toMs}\n${tf}${this.onChainEVs.map((ev) => ev.show()).join(`\n`)}\n${tf}${this.eligibleEVs.map((ev) => ev.show()).join(`\n`)}\n${tf}${this.suitableForElection}\n${tf}${this.phase}`;
   };
 
   /**

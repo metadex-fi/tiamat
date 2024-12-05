@@ -52,14 +52,13 @@ const ellypsis = `*`;
  */
 console.log = async (...args) => {
   const circaSlot = `[${(Date.now() - startTime) / slotDurationMs}]`;
-  originalLog(circaSlot, ...args);
   if (args.length && typeof args[0] === `string`) {
     const arg0 = args[0];
     const from = arg0.indexOf(`[`);
     const to = arg0.indexOf(`]`);
     if (from === -1 || to === -1 || to - from <= 1) {
       // If no prefix, just log normally
-      // originalLog(circaSlot, ...args);
+      originalLog(circaSlot, ...args);
       return;
     }
     const fullName = arg0.slice(from + 1, to);

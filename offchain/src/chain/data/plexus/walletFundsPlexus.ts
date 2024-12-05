@@ -19,7 +19,7 @@ export class WalletFundsPlexus extends Plexus {
       walletFunds: Map<Core.AssetId, bigint>,
       _trace: Trace,
     ): Promise<WalletFunds> => {
-      return Promise.resolve(new WalletFunds(walletFunds));
+      return Promise.resolve(new WalletFunds(new Map(walletFunds))); // TODO new Map necessary?
     };
 
     this.walletFundsStem = new WalletFundsStem(wallet, senseWalletFunds);

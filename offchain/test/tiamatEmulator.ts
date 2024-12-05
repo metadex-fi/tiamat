@@ -410,6 +410,8 @@ export class TiamatEmulator<
           vectorAddresses.push(addresses[Number(i)]!.address);
         }
 
+        console.log(`STARTING SERVERS\n`);
+
         // start servers
         for (const vector of vectors) {
           vector.serve();
@@ -419,6 +421,13 @@ export class TiamatEmulator<
           trial,
           this.emulatorParams.numInitialBlocks,
         );
+
+        waitingSlots = 0;
+        for (let i = this.emulatorParams.numBlocksPerCycle; i >= 0; i--) {
+          console.log(`${i}..`);
+          await emulator.awaitNextBlock();
+          waitingSlots += slotsPerBlock;
+        }
 
         console.log(`GENERATING USERS\n`);
         // generate users

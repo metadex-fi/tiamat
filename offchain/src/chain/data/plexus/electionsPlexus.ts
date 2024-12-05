@@ -67,6 +67,10 @@ class MatrixNexusBlock<DC extends PDappConfigT, DP extends PDappParamsT>
       this.block === other.block
     );
   };
+
+  public show = (_tabs = ``): string => {
+    return `MatrixNexusBlock: ${this.matrix} ${this.nexus} ${this.block}`;
+  };
 }
 
 class MatrixNexusBlocksGanglion<
@@ -192,16 +196,20 @@ export class CurrentElectionEffector<
 > extends Effector<ElectionData<DC, DP>> {
   constructor(
     name: string,
+    prepareForConnections: (
+      election: ElectionData<DC, DP>,
+      trace: Trace,
+    ) => Promise<Result>,
     updateConnections: (
       election: ElectionData<DC, DP>,
       trace: Trace,
-    ) => Promise<Result>, // TODO
+    ) => Promise<Result>,
   ) {
     name = `${name} CurrentElectionEffector`;
     const connect = async (
       data: ElectionData<DC, DP>,
       trace: Trace,
-    ): Promise<[Result]> => {
+    ): Promise<Result[]> => {
       const trace_ = trace.via(`${name}.connect`);
       const phase = data.phase.type;
       if (
@@ -210,14 +218,17 @@ export class CurrentElectionEffector<
       ) {
         return [
           new Result(
-            [`within double margin or less, not connecting`],
+            [`within double margin or less, doing nothing`],
             this.name,
             `connect`,
             trace_,
           ),
         ];
       } else {
-        return [await updateConnections(data, trace_)];
+        return await Promise.all([
+          prepareForConnections(data, trace_),
+          updateConnections(data, trace_),
+        ]);
       }
     };
     const currentElectionEffect = new Callback(
@@ -248,11 +259,11 @@ export class NextElectionEffector<
     prepareForConnections: (
       election: ElectionData<DC, DP>,
       trace: Trace,
-    ) => Promise<Result>, // TODO
+    ) => Promise<Result>,
     updateConnections: (
       election: ElectionData<DC, DP>,
       trace: Trace,
-    ) => Promise<Result>, // TODO
+    ) => Promise<Result>,
   ) {
     name = `${name} NextElectionEffector`;
     const discernMargins = async (
@@ -421,6 +432,7 @@ export class ElectionsPlexus<
 
     const currentElectionEffector = new CurrentElectionEffector(
       this.name,
+      prepareForConnections,
       updateConnections,
     ) as Effector<ElectionData<DC, DP>>;
 

@@ -75,6 +75,13 @@ export abstract class Intent<
     chainGanglion.innervateEffector(chainEffector);
   }
 
+  public get display(): {
+    conflux: Conflux<ChoicesT, StatusT>;
+    status: `choosing` | `pending` | `success` | `failure` | `retrying`;
+  } {
+    return { conflux: this.conflux, status: this.status };
+  }
+
   public userInput = (userChoices: ChoicesT): void => {
     assert(
       this.status === `choosing`,

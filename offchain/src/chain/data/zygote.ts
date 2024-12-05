@@ -1,5 +1,5 @@
 import { Core } from "@blaze-cardano/sdk";
-import { PData } from "../../types/general/fundamental/type";
+import { f, PData } from "../../types/general/fundamental/type";
 import { UtxoSet } from "../../utils/wrappers";
 import { TiamatSvmUtxo } from "../state/tiamatSvmUtxo";
 import { Immutable } from "../../utils/immutable";
@@ -8,6 +8,7 @@ export type Zygote = Immutable<Cyst>;
 
 abstract class Cyst {
   abstract equals(other: Zygote): boolean;
+  abstract show(tabs: string): string;
 }
 
 export class WalletUtxos implements Zygote {
@@ -21,6 +22,10 @@ export class WalletUtxos implements Zygote {
       return this.maybeUtxos.equals(other.maybeUtxos);
     }
   };
+  public show = (tabs = ``): string => {
+    const tf = `${tabs}${f}`;
+    return `WalletUtxos: ${this.maybeUtxos === `virginal` ? this.maybeUtxos : this.maybeUtxos.show(tf)}`;
+  };
 }
 
 export class WalletFunds implements Zygote {
@@ -29,15 +34,47 @@ export class WalletFunds implements Zygote {
     this.funds = new Map(funds);
   }
   public equals = (other: WalletFunds): boolean => {
+    console.log(`comparing`, this.funds, `with`, other.funds);
+    if (this.funds === other.funds) {
+      console.log(`same instance`);
+      return true;
+    }
     if (this.funds.size !== other.funds.size) {
+      console.log(`different sizes:`, this.funds.size, `vs`, other.funds.size);
       return false;
     }
+    console.log(`same sizes:`, this.funds.size, `vs`, other.funds.size);
     for (const [assetID, amount] of this.funds) {
       if (other.funds.get(assetID) !== amount) {
+        console.log(
+          `different amount for`,
+          assetID,
+          `:`,
+          amount,
+          `vs`,
+          other.funds.get(assetID),
+        );
         return false;
       }
+      console.log(
+        `same amount for`,
+        assetID,
+        `:`,
+        amount,
+        `vs`,
+        other.funds.get(assetID),
+      );
     }
+    console.log(`all amounts are the same`);
     return true;
+  };
+
+  public show = (tabs = ``): string => {
+    if (this.funds.size === 0) {
+      return `WalletFunds: None`;
+    }
+    const tf = `${tabs}${f}`;
+    return `WalletFunds:\n${[...this.funds.entries()].map(([assetID, amount]) => `${tf}"${assetID}": ${amount}`).join(`\n`)}`;
   };
 }
 
@@ -64,6 +101,10 @@ export class MaybeSvmUtxo<
       return this.maybeUtxo.sameUtxo(other.maybeUtxo);
     }
   };
+
+  public show = (_tabs = ``): string => {
+    return `MaybeSvmUtxo: ${this.maybeUtxo === `virginal` ? this.maybeUtxo : `TiamatSvmUtxo`}`;
+  };
 }
 
 export class BlockHeight implements Zygote {
@@ -71,5 +112,9 @@ export class BlockHeight implements Zygote {
 
   public equals = (other: BlockHeight): boolean => {
     return this.maybeBlock === other.maybeBlock;
+  };
+
+  public show = (_tabs = ``): string => {
+    return `BlockHeight: ${this.maybeBlock}`;
   };
 }

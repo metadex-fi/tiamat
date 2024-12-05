@@ -2,10 +2,16 @@ import { Core } from "@blaze-cardano/sdk";
 import { Bech32Address, Tx, UtxoSet } from "../../../utils/wrappers";
 import { Precon } from "../precon";
 import assert from "assert";
-import { txFees } from "../../../utils/constants";
+import {
+  minNumTxFees,
+  prefundNumTxFees,
+  txFees,
+} from "../../../utils/constants";
 import { Ganglion } from "../../data/ganglion";
 import { Zygote } from "../../data/zygote";
 import { PDappConfigT, PDappParamsT } from "../../../types/tiamat/tiamat";
+import { min } from "../../../utils/generators";
+import { f } from "../../../types/general/fundamental/type";
 
 export class WalletsFundsStatus implements Zygote {
   public readonly ownerFunds: Map<Core.AssetId, bigint>;
@@ -37,6 +43,18 @@ export class WalletsFundsStatus implements Zygote {
     }
     return true;
   };
+
+  public get ownerADA(): bigint {
+    return this.ownerFunds.get(`` as Core.AssetId) ?? 0n;
+  }
+  public get servitorADA(): bigint {
+    return this.servitorFunds.get(`` as Core.AssetId) ?? 0n;
+  }
+
+  public show = (tabs = ``): string => {
+    const tf = `${tabs}${f}`;
+    return `WalletsFundsStatus:\n${tf}ownerFunds: ${[...this.ownerFunds.entries()].map(([assetID, amount]) => `${tf}${f}"${assetID}": ${amount}`).join(`\n`)}\n${tf}servitorFunds: ${[...this.servitorFunds.entries()].map(([assetID, amount]) => `${tf}${f}"${assetID}": ${amount}`).join(`\n`)}`;
+  };
 }
 
 export class ServitorPrecon<
@@ -47,14 +65,13 @@ export class ServitorPrecon<
     name: string,
     priorGanglion: Ganglion<any[], WalletsFundsStatus>,
     servitorAddress: Bech32Address,
-    numTxFees: bigint, // how many txes to fund.
   ) {
     name = `${name} ServitorPrecon`;
 
-    // check if servitor has enough ADA.
+    // check if servitor has enough ADA for at least one action- and tipping-tx.
+    // TODO could reduce this to 1 for unhinged txes.
     const isMetBy = (prior: WalletsFundsStatus): boolean => {
-      const servitorADA = prior.servitorFunds.get(`` as Core.AssetId) ?? 0n;
-      return servitorADA >= numTxFees * txFees;
+      return prior.servitorADA >= minNumTxFees * txFees;
     };
 
     // funds to fund the servitor-wallet come from the owner-wallet, naturally.
@@ -62,16 +79,18 @@ export class ServitorPrecon<
 
     // send some ADA from the owner-wallet to the servitor-wallet.
     const fixTx = (tx: Tx, prior: WalletsFundsStatus): Tx => {
-      const ownerADA = prior.ownerFunds.get(`` as Core.AssetId);
+      const ownerADA = prior.ownerFunds.get(`` as Core.AssetId) ?? 0n;
+      const coveredNumTxFees = ownerADA / txFees - 1n; // -1n for the prefunding tx itself
       assert(
-        ownerADA && ownerADA >= (1n + numTxFees) * txFees,
-        `${name}: not enough ADA to cover fees for 1 + ${numTxFees} txes: ${ownerADA} < ${
-          (1n + numTxFees) * txFees
+        coveredNumTxFees >= minNumTxFees,
+        `${name}: not enough ADA to cover fees for 1 + ${minNumTxFees} txes: ${ownerADA} < ${
+          (1n + minNumTxFees) * txFees
         }.\nOwner-funds: [${[...prior.ownerFunds.entries()].join(`, `)}]`,
       );
+      const prefundNumTxFees_ = min(coveredNumTxFees, prefundNumTxFees);
       return tx.payAssets(
         servitorAddress.blaze,
-        new Core.Value(numTxFees * txFees),
+        new Core.Value(prefundNumTxFees_ * txFees),
       );
     };
 

@@ -1,5 +1,5 @@
 import { Core } from "@blaze-cardano/sdk";
-import { PData } from "../../types/general/fundamental/type";
+import { PData, t } from "../../types/general/fundamental/type";
 import { Trace, UtxoSet } from "../../utils/wrappers";
 import { Callback, Result } from "../state/callback";
 import { TiamatSvm } from "../state/tiamatSvm";
@@ -51,6 +51,7 @@ class Stem<PerceptT, ZT extends Zygote> extends Ganglion<ZT[], ZT> {
     trace: Trace,
   ): Promise<[Result]> => {
     const trace_ = trace.via(`${this.name}.sense`);
+    await new Promise((resolve) => setTimeout(resolve, 0)); // TODO hack to tie to event loop
     if (this.processSemaphore.busy) {
       this.doubleTapped = true;
       return [new Result([`Busy`], this.name, `sense`, trace_)];
@@ -66,11 +67,13 @@ class Stem<PerceptT, ZT extends Zygote> extends Ganglion<ZT[], ZT> {
           this.log(`No change in perception:`, this.current);
           result.push(`No change in perception`);
         } else {
+          const current_ =
+            this.current === `virginal` ? `virginal` : this.current.show(t);
           this.log(
             `Perception changed:\n`,
-            this.current,
+            current_,
             `\n\t⬇\n`,
-            perception,
+            perception.show(t),
           );
           this.current = perception;
           const result_ = await this.induceEfferents(perception, trace_);
@@ -109,7 +112,7 @@ export class SvmStem<
     svm: TiamatSvm<PConfig, PState, PAction>,
     sensing: (
       svmUtxos: TiamatSvmUtxo<PConfig, PState, PAction>[],
-      trace2: Trace,
+      trace: Trace,
     ) => Promise<MaybeSvmUtxo<PConfig, PState, PAction>>,
     tolerance = 0,
   ) {
@@ -126,7 +129,7 @@ export class WalletUtxosStem extends Stem<UtxoSet, WalletUtxos> {
   readonly __brand = `WalletUtxosStem`;
   constructor(
     wallet: Wallet,
-    sensing: (walletUtxos: UtxoSet, trace2: Trace) => Promise<WalletUtxos>,
+    sensing: (walletUtxos: UtxoSet, trace: Trace) => Promise<WalletUtxos>,
   ) {
     const name = `${wallet.name} WalletUtxosStem`;
     super(name, sensing);
@@ -150,7 +153,7 @@ export class WalletFundsStem extends Stem<
     wallet: Wallet,
     sensing: (
       walletFunds: Map<Core.AssetId, bigint>,
-      trace2: Trace,
+      trace: Trace,
     ) => Promise<WalletFunds>,
   ) {
     const name = `${wallet.name} WalletFundsStem`;

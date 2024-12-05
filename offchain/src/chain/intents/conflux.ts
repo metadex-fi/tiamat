@@ -1,3 +1,4 @@
+import { f } from "../../types/general/fundamental/type";
 import { Zygote } from "../data/zygote";
 
 /**
@@ -33,5 +34,10 @@ export abstract class Conflux<ChoicesT extends Zygote, StatusT extends Zygote>
       this.state === other.state &&
       this.feedbackMsg === other.feedbackMsg
     );
+  };
+
+  public show = (tabs = ``): string => {
+    const tf = `${tabs}${f}`;
+    return `Conflux:\n${tf}userChoices: ${this.userChoices.show(tf)}\n${tf}chainStatus: ${this.chainStatus.show(tf)}\n${f}state: ${this.state}\n${tf}feedbackMsg: ${this.feedbackMsg}`;
   };
 }

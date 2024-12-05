@@ -12,7 +12,7 @@ import { UtxoSource } from "../state/utxoSource";
 import { Token } from "../../types/general/derived/asset/token";
 import { Bech32Address, UtxoSet, Trace, Tx, P, W } from "../../utils/wrappers";
 import { TiamatContract } from "../state/tiamatContract";
-import { errorTimeoutMs, numTxFees } from "../../utils/constants";
+import { errorTimeoutMs } from "../../utils/constants";
 import { WalletFundsPlexus } from "../data/plexus/walletFundsPlexus";
 import { ServitorPreconPlexus } from "../data/plexus/servitorPreconPlexus";
 import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
@@ -391,7 +391,6 @@ export abstract class TiamatUser<
     this.ownerFundsPlexus = new WalletFundsPlexus(this.ownerWallet);
     this.servitorPreconPlexus = new ServitorPreconPlexus(
       this,
-      numTxFees,
       this.servitorFundsPlexus,
       this.ownerFundsPlexus,
     );
