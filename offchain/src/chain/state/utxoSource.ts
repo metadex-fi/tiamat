@@ -236,7 +236,7 @@ export class UtxoSource {
    * @param callback
    */
   public subscribeToAddress = (
-    subscriber: TiamatSvm<any, any, any> | Wallet,
+    subscriber: TiamatSvm<any, any, any> | Wallet<any>,
     address: Bech32Address,
     callback: Callback<UtxoEvents>,
   ) => {
@@ -371,7 +371,7 @@ export class UtxoSource {
    * @param callback
    */
   public subscribeToNewBlock = (
-    subscriber: Wallet | BlocksStem | SocketServer<any, any, any>,
+    subscriber: Wallet<any> | BlocksStem | SocketServer<any, any, any>,
     callback: Callback<number>,
   ): Promise<Result> => {
     this.log(`subscribeToNewBlock`);

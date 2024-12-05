@@ -28,44 +28,26 @@ export class WalletUtxos implements Zygote {
   };
 }
 
-export class WalletFunds implements Zygote {
+export class WalletFunds<WT extends `servitor` | `owner`> implements Zygote {
   public readonly funds: Map<Core.AssetId, bigint>;
-  constructor(funds: Map<Core.AssetId, bigint>) {
+  constructor(
+    public readonly wallet: WT,
+    funds: Map<Core.AssetId, bigint>,
+  ) {
     this.funds = new Map(funds);
   }
-  public equals = (other: WalletFunds): boolean => {
-    console.log(`comparing`, this.funds, `with`, other.funds);
+  public equals = (other: WalletFunds<WT>): boolean => {
     if (this.funds === other.funds) {
-      console.log(`same instance`);
       return true;
     }
     if (this.funds.size !== other.funds.size) {
-      console.log(`different sizes:`, this.funds.size, `vs`, other.funds.size);
       return false;
     }
-    console.log(`same sizes:`, this.funds.size, `vs`, other.funds.size);
     for (const [assetID, amount] of this.funds) {
       if (other.funds.get(assetID) !== amount) {
-        console.log(
-          `different amount for`,
-          assetID,
-          `:`,
-          amount,
-          `vs`,
-          other.funds.get(assetID),
-        );
         return false;
       }
-      console.log(
-        `same amount for`,
-        assetID,
-        `:`,
-        amount,
-        `vs`,
-        other.funds.get(assetID),
-      );
     }
-    console.log(`all amounts are the same`);
     return true;
   };
 

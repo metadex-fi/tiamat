@@ -1,6 +1,6 @@
 import assert from "assert";
 import { Simplephore } from "../agents/semaphore";
-import { Sent, UtxoEvent, UtxoEvents, UtxoSource } from "./utxoSource";
+import { UtxoEvent, UtxoEvents, UtxoSource } from "./utxoSource";
 import { Callback, Result } from "./callback";
 import { Bech32Address, Trace, Tx, UtxoSet } from "../../utils/wrappers";
 import {
@@ -15,7 +15,7 @@ import { WalletFundsStem, WalletUtxosStem } from "../data/stem";
 /**
  *
  */
-export class Wallet {
+export class Wallet<WT extends `servitor` | `owner`> {
   private static instances = new Map<string, number>();
   public readonly name: string;
 
@@ -45,11 +45,12 @@ export class Wallet {
    */
   constructor(
     name: string,
+    public readonly type: WT,
     private readonly blaze: Blaze<Provider, BlazeWallet>,
     forWalletOrAddress: `allWalletAddresses` | Bech32Address,
     private readonly utxoSource: UtxoSource,
   ) {
-    this.name = `${name} Wallet`;
+    this.name = `${name} ${type} Wallet`;
     const instance = Wallet.instances.get(name) ?? 0;
     Wallet.instances.set(this.name, instance + 1);
     if (instance) this.name = `${this.name}#${instance}`;
@@ -97,7 +98,7 @@ export class Wallet {
    * @param callback
    */
   public innervateUtxosStem = async (
-    stem: WalletUtxosStem,
+    stem: WalletUtxosStem<WT>,
     callback: Callback<UtxoSet>,
   ): Promise<Result> => {
     this.log(`innervating utxo stem:`, callback.show());
@@ -119,7 +120,7 @@ export class Wallet {
    * @param callback
    */
   public innervateFundsStem = async (
-    stem: WalletFundsStem,
+    stem: WalletFundsStem<WT>,
     callback: Callback<Map<Core.AssetId, bigint>>,
   ): Promise<Result> => {
     this.log(`innervating funds stem:`, callback.show());

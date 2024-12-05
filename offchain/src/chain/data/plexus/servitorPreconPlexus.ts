@@ -11,8 +11,11 @@ import { PDappConfigT, PDappParamsT } from "../../../types/tiamat/tiamat";
 import { WalletFunds } from "../zygote";
 import { TiamatContract } from "../../state/tiamatContract";
 import { Result } from "../../state/callback";
+import { WalletFundsStem } from "../stem";
 
-export type WalletsFundsGanglion = Ganglion<WalletFunds[], WalletsFundsStatus>;
+type InZsT = [WalletFunds<`servitor`>, WalletFunds<`owner`>];
+
+export type WalletsFundsGanglion = Ganglion<InZsT, WalletsFundsStatus>;
 
 /**
  *
@@ -27,28 +30,28 @@ export class ServitorPreconPlexus<
 
   constructor(
     user: TiamatUser<DC, DP, CT>,
-    private readonly servitorFundsPlexus: WalletFundsPlexus,
-    private readonly ownerFundsPlexus: WalletFundsPlexus,
+    private readonly servitorFundsPlexus: WalletFundsPlexus<`servitor`>,
+    private readonly ownerFundsPlexus: WalletFundsPlexus<`owner`>,
   ) {
     super(`${user.name} ServitorPreconPlexus`);
     const ganglionName = `${user.name} WalletsFundsGanglion`;
-    const afferents = [
+    const afferents: [WalletFundsStem<`servitor`>, WalletFundsStem<`owner`>] = [
       this.servitorFundsPlexus.walletFundsStem,
       this.ownerFundsPlexus.walletFundsStem,
     ];
     const procedure = (
       afferentStates: Map<
-        Ganglion<WalletFunds[], WalletFunds>,
-        WalletFunds | `virginal`
+        Ganglion<InZsT[number][], InZsT[number]>,
+        InZsT[number] | `virginal`
       >,
       _previous: WalletsFundsStatus | `virginal`,
       _signal: AbortSignal,
     ): Promise<WalletsFundsStatus | `virginal`> => {
       const servitorFunds = afferentStates.get(
-        this.servitorFundsPlexus.walletFundsStem,
+        this.servitorFundsPlexus.walletFundsStem as any,
       );
       const ownerFunds = afferentStates.get(
-        this.ownerFundsPlexus.walletFundsStem,
+        this.ownerFundsPlexus.walletFundsStem as any,
       );
       assert(
         servitorFunds && ownerFunds,
@@ -60,12 +63,14 @@ export class ServitorPreconPlexus<
         );
         return Promise.resolve(`virginal`);
       }
-      return Promise.resolve(
-        new WalletsFundsStatus(servitorFunds.funds, ownerFunds.funds),
-      );
+
+      assert(ownerFunds.wallet === `owner`, `ownerFunds not owner`);
+      assert(servitorFunds.wallet === `servitor`, `servitorFunds not servitor`);
+
+      return Promise.resolve(new WalletsFundsStatus(ownerFunds, servitorFunds));
     };
 
-    this.walletsFundsGanglion = new Ganglion<WalletFunds[], WalletsFundsStatus>(
+    this.walletsFundsGanglion = new Ganglion<InZsT, WalletsFundsStatus>(
       ganglionName,
       afferents,
       procedure,

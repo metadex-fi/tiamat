@@ -169,7 +169,8 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
         const afferentStates = new Map(
           this.afferents.map((afferent) => {
             const scion = afferent.scion;
-            this.log(`afferent ${afferent.name} state:`, scion);
+            const scion_ = scion === `virginal` ? `virginal` : scion.show(t);
+            this.log(`afferent ${afferent.name} state:`, scion_);
             return [afferent, scion];
           }),
         );

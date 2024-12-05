@@ -9,17 +9,17 @@ import { Result } from "../../state/callback";
 /**
  *
  */
-export class WalletFundsPlexus extends Plexus {
-  public readonly walletFundsStem: WalletFundsStem;
+export class WalletFundsPlexus<WT extends `servitor` | `owner`> extends Plexus {
+  public readonly walletFundsStem: WalletFundsStem<WT>;
 
-  constructor(private readonly wallet: Wallet) {
+  constructor(private readonly wallet: Wallet<WT>) {
     super(`${wallet.name} WalletFundsPlexus`);
 
     const senseWalletFunds = (
       walletFunds: Map<Core.AssetId, bigint>,
       _trace: Trace,
-    ): Promise<WalletFunds> => {
-      return Promise.resolve(new WalletFunds(new Map(walletFunds))); // TODO new Map necessary?
+    ): Promise<WalletFunds<WT>> => {
+      return Promise.resolve(new WalletFunds(wallet.type, walletFunds));
     };
 
     this.walletFundsStem = new WalletFundsStem(wallet, senseWalletFunds);

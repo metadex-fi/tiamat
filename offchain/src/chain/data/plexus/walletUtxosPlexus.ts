@@ -11,10 +11,10 @@ export type WalletUtxosGanglion = Ganglion<WalletUtxos[], WalletUtxos>;
 /**
  *
  */
-export class WalletUtxosPlexus extends Plexus {
-  public readonly walletUtxosStem: WalletUtxosStem;
+export class WalletUtxosPlexus<WT extends `servitor` | `owner`> extends Plexus {
+  public readonly walletUtxosStem: WalletUtxosStem<WT>;
 
-  constructor(wallet: Wallet) {
+  constructor(wallet: Wallet<WT>) {
     super(`${wallet.name} WalletUtxosPlexus`);
 
     const senseWalletUtxos = (

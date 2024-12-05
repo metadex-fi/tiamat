@@ -8,7 +8,7 @@ import {
   txFees,
 } from "../../../utils/constants";
 import { Ganglion } from "../../data/ganglion";
-import { Zygote } from "../../data/zygote";
+import { WalletFunds, Zygote } from "../../data/zygote";
 import { PDappConfigT, PDappParamsT } from "../../../types/tiamat/tiamat";
 import { min } from "../../../utils/generators";
 import { f } from "../../../types/general/fundamental/type";
@@ -17,11 +17,11 @@ export class WalletsFundsStatus implements Zygote {
   public readonly ownerFunds: Map<Core.AssetId, bigint>;
   public readonly servitorFunds: Map<Core.AssetId, bigint>;
   constructor(
-    ownerFunds: Map<Core.AssetId, bigint>,
-    servitorFunds: Map<Core.AssetId, bigint>,
+    ownerFunds: WalletFunds<`owner`>,
+    servitorFunds: WalletFunds<`servitor`>,
   ) {
-    this.ownerFunds = new Map(ownerFunds);
-    this.servitorFunds = new Map(servitorFunds);
+    this.ownerFunds = new Map(ownerFunds.funds);
+    this.servitorFunds = new Map(servitorFunds.funds);
   }
 
   public equals = (other: WalletsFundsStatus): boolean => {
@@ -53,7 +53,8 @@ export class WalletsFundsStatus implements Zygote {
 
   public show = (tabs = ``): string => {
     const tf = `${tabs}${f}`;
-    return `WalletsFundsStatus:\n${tf}ownerFunds: ${[...this.ownerFunds.entries()].map(([assetID, amount]) => `${tf}${f}"${assetID}": ${amount}`).join(`\n`)}\n${tf}servitorFunds: ${[...this.servitorFunds.entries()].map(([assetID, amount]) => `${tf}${f}"${assetID}": ${amount}`).join(`\n`)}`;
+    const tff = `${tf}${f}`;
+    return `WalletsFundsStatus:\n${tf}ownerFunds:\n${[...this.ownerFunds.entries()].map(([assetID, amount]) => `${tff}"${assetID}": ${amount}`).join(`\n`)}\n${tf}servitorFunds:\n${[...this.servitorFunds.entries()].map(([assetID, amount]) => `${tff}"${assetID}": ${amount}`).join(`\n`)}`;
   };
 }
 

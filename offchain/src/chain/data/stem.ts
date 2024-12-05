@@ -125,10 +125,13 @@ export class SvmStem<
   }
 }
 
-export class WalletUtxosStem extends Stem<UtxoSet, WalletUtxos> {
+export class WalletUtxosStem<WT extends `servitor` | `owner`> extends Stem<
+  UtxoSet,
+  WalletUtxos
+> {
   readonly __brand = `WalletUtxosStem`;
   constructor(
-    wallet: Wallet,
+    wallet: Wallet<WT>,
     sensing: (walletUtxos: UtxoSet, trace: Trace) => Promise<WalletUtxos>,
   ) {
     const name = `${wallet.name} WalletUtxosStem`;
@@ -144,17 +147,17 @@ export class WalletUtxosStem extends Stem<UtxoSet, WalletUtxos> {
   }
 }
 
-export class WalletFundsStem extends Stem<
+export class WalletFundsStem<WT extends `servitor` | `owner`> extends Stem<
   Map<Core.AssetId, bigint>,
-  WalletFunds
+  WalletFunds<WT>
 > {
   readonly __brand = `WalletFundsStem`;
   constructor(
-    wallet: Wallet,
+    wallet: Wallet<WT>,
     sensing: (
       walletFunds: Map<Core.AssetId, bigint>,
       trace: Trace,
-    ) => Promise<WalletFunds>,
+    ) => Promise<WalletFunds<WT>>,
   ) {
     const name = `${wallet.name} WalletFundsStem`;
     super(name, sensing);

@@ -84,12 +84,12 @@ export abstract class TiamatUser<
   protected static instances = new Map<string, number>();
   protected static singleton?: TiamatUser<any, any, any>;
 
-  public readonly ownerWallet: Wallet;
-  public readonly servitorWallet: Wallet;
+  public readonly ownerWallet: Wallet<`owner`>;
+  public readonly servitorWallet: Wallet<`servitor`>;
 
   public readonly cortex: TiamatCortex<DC, DP, CT>;
-  public readonly servitorFundsPlexus: WalletFundsPlexus;
-  public readonly ownerFundsPlexus: WalletFundsPlexus;
+  public readonly servitorFundsPlexus: WalletFundsPlexus<`servitor`>;
+  public readonly ownerFundsPlexus: WalletFundsPlexus<`owner`>;
   public readonly servitorPreconPlexus: ServitorPreconPlexus<DC, DP, CT>;
 
   // mainly for blocking during election-margins
@@ -374,14 +374,16 @@ export abstract class TiamatUser<
     this.actionSemaphore = new Semaphore(`${this.name} Action`);
     this.lockSemaphore = new Simplephore(`${this.name} Lock`);
     this.servitorWallet = new Wallet(
-      `${name} Servitor`,
+      name,
+      `servitor`,
       servitorBlaze,
       servitorAddress, //servitorBlaze.wallet,//blazeServitorAddress,
       contract.utxoSource,
     );
 
     this.ownerWallet = new Wallet(
-      `${name} Owner`,
+      name,
+      `owner`,
       ownerBlaze,
       `allWalletAddresses`, //blazeOwnerAddress,
       contract.utxoSource,
