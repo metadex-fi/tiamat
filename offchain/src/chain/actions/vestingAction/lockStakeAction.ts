@@ -16,7 +16,7 @@ import { PDappConfigT, PDappParamsT } from "../../../types/tiamat/tiamat";
  *
  */
 export class LockStakeAction<DC extends PDappConfigT, DP extends PDappParamsT>
-  implements StartingAction<DC, DP, VestingUtxo>
+  implements StartingAction<DC, DP, VestingUtxo, `owner`>
 {
   /**
    *
@@ -39,11 +39,11 @@ export class LockStakeAction<DC extends PDappConfigT, DP extends PDappParamsT>
    * @param seedUtxos
    */
   public startingTx = (
-    tx: Tx,
+    tx: Tx<`owner`>,
     // submitCallback: Callback<TxId>,
     ackCallback: Callback<TxId>,
     seedUtxos: UtxoSet,
-  ): Tx => {
+  ): Tx<`owner`> => {
     console.log(`LockStakeAction.startingTx`);
     assert(seedUtxos.size, `LockStakeAction: ${seedUtxos.size} < 1 utxos`);
     seedUtxos = seedUtxos.clone();

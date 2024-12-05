@@ -15,7 +15,9 @@ import { UnhingedAction } from "../action";
 /**
  *
  */
-export class RegisterVectorAction implements UnhingedAction<MatrixUtxo> {
+export class RegisterVectorAction
+  implements UnhingedAction<MatrixUtxo, `owner`>
+{
   public readonly action: MatrixAction;
   public readonly newState: MatrixState;
   public readonly newValue: PositiveValue;
@@ -85,11 +87,11 @@ export class RegisterVectorAction implements UnhingedAction<MatrixUtxo> {
    * @param nexusUtxo
    */
   public unhingedTx = (
-    tx: Tx,
+    tx: Tx<`owner`>,
     // submitCallback: Callback<TxId>,
     ackCallback: Callback<TxId>,
     nexusUtxo: TraceUtxo,
-  ): Tx => {
+  ): Tx<`owner`> => {
     console.log(`RegisterVectorAction.unhingedTx`);
     tx = this.matrixUtxo
       .revolvingTx(

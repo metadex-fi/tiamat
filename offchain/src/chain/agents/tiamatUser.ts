@@ -465,7 +465,9 @@ export abstract class TiamatUser<
     return new Result([result], this.name, `lockDuringMargins`, trace);
   };
 
-  public newTx = async (ofWallet: `servitor` | `owner`): Promise<Tx> => {
+  public newTx = async <WT extends `servitor` | `owner`>(
+    ofWallet: WT,
+  ): Promise<Tx<WT>> => {
     return ofWallet === `servitor`
       ? this.servitorWallet.newTx()
       : this.ownerWallet.newTx();

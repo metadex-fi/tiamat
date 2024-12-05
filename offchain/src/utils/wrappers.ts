@@ -105,8 +105,12 @@ export type W = Wallet;
 /**
  *
  */
-export class Tx extends OilTx<P, W> {}
+export class Tx<WT extends `servitor` | `owner`> extends OilTx<P, W, WT> {}
 /**
  *
  */
-export class TxCompleat extends OilTxCompleat<P, W> {}
+export class TxCompleat<WT extends `servitor` | `owner`> extends OilTxCompleat<
+  P,
+  W,
+  WT
+> {}

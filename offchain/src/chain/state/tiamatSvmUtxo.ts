@@ -161,7 +161,7 @@ export class TiamatSvmUtxo<
     PAction extends PData,
   >(
     svm: TiamatSvm<PConfig, PState, PAction>,
-    tx: TxCompleat,
+    tx: TxCompleat<`servitor` | `owner`>,
     inlineScript: boolean,
     singletonID: Token | null,
   ): TiamatSvmUtxo<PConfig, PState, PAction> {
@@ -237,12 +237,12 @@ export class TiamatSvmUtxo<
    * @param extraUtxos
    * @param nexusUtxo
    */
-  public startingTx = (
-    tx: Tx,
+  public startingTx = <WT extends `servitor` | `owner`>(
+    tx: Tx<WT>,
     ackCallback: Callback<TxId> | `genesis`,
     extraUtxos: UtxoSet,
     nexusUtxo?: TraceUtxo,
-  ): Tx => {
+  ): Tx<WT> => {
     assert(
       this.svmDatum,
       `SvmUtxo<${this.svm.label}>.quickStartTx: no svmDatum`,
@@ -284,10 +284,10 @@ export class TiamatSvmUtxo<
     console.log(`SvmUtxo<${this.svm.label}>.startingTx: newValue =`, newValue_);
 
     const utxos = extraUtxos.clone();
-    utxos.insertNew(
-      this.utxo.core,
-      this.utxo.trace.via(`${this.svm.label}.startingTx`),
-    );
+    // utxos.insertNew(
+    //   this.utxo.core,
+    //   this.utxo.trace.via(`${this.svm.label}.startingTx`),
+    // );
     console.log(
       `starting tx with utxos:\n`,
       utxos.list
@@ -300,6 +300,7 @@ export class TiamatSvmUtxo<
     console.log(`...paying to contract:`, newValue_.toCore());
 
     return tx
+      .addInput(this.utxo)
       .addUnspentOutputs(utxos.list)
       .addMint(
         this.idNFT.currency.toBlaze(),
@@ -326,14 +327,14 @@ export class TiamatSvmUtxo<
    * @param nexusUtxo
    */
   public revolvingTx = (
-    tx: Tx,
+    tx: Tx<`servitor`>,
     ackCallback: Callback<TxId>,
     type: "unhinged" | "revolve",
     action: PLifted<PAction>,
     newState: PLifted<PState>,
     newValue: PositiveValue,
     nexusUtxo: TraceUtxo | `isNexus`, // nexus does not have to read itself in addition to spending itself
-  ): Tx => {
+  ): Tx<`servitor`> => {
     assert(
       this.svmDatum,
       `SvmUtxo<${this.svm.label}>.revolvingTx: no svmDatum`,
@@ -410,13 +411,13 @@ export class TiamatSvmUtxo<
    * @param action
    * @param nexusUtxo
    */
-  public haltingTx = (
-    tx: Tx,
+  public haltingTx = <WT extends `servitor` | `owner`>(
+    tx: Tx<WT>,
     // submitCallback: Callback<TxId>,
     ackCallback: Callback<TxId>,
     action: PLifted<PAction>,
     nexusUtxo?: TraceUtxo, // not required for all svms
-  ): Tx => {
+  ): Tx<WT> => {
     assert(this.utxo, `SvmUtxo<${this.svm.label}>.haltingTx: no utxo`);
     assert(
       !this.spent,
@@ -455,7 +456,7 @@ export class TiamatSvmUtxo<
    *
    * @param tx
    */
-  public wipingTx = (tx: Tx): Tx => {
+  public wipingTx = <WT extends `servitor` | `owner`>(tx: Tx<WT>): Tx<WT> => {
     assert(this.utxo, `SvmUtxo<${this.svm.label}>.wipingTx: no utxo`);
     const wipingRedeemer = this.svm.psvmRedeemer.pconstant(new Wipe());
 

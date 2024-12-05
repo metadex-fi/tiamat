@@ -14,6 +14,11 @@ use tiamat/util/util_types/misc_types.{Asset}
 fn from(
   seed: tx.OutputReference,
 ) -> crypto.Hash<crypto.Blake2b_256, tx.OutputReference> {
+  trace @"seed.transaction_id"
+  trace seed.transaction_id
+  trace @"seed.output_index"
+  trace seed.output_index
+  trace bytearray.push(seed.transaction_id, seed.output_index) 
   seed.transaction_id
     |> bytearray.push(seed.output_index)
     |> crypto.blake2b_256
@@ -41,35 +46,53 @@ pub fn mk_thread_nft(
         fn(nft_amount) {
           let Pair(nft, amount) = nft_amount
           let half_nft = bytearray.drop(nft, 16)
-          amount == -1 || amount == 1 && list.any(
-            tx.inputs,
-            fn(input) { from(input.output_reference) == half_nft },
-          ) && list.any(
-            tx.outputs,
-            fn(output) { output.address == svm_address && {
-                let token_pairs =
-                  output.value
-                    |> assets.tokens(this_policy)
-                    |> dict.to_pairs
-                when token_pairs is {
-                  [Pair(id_nft, 1)] -> {
-                    let datum = extraction_fn(output)
+          amount == -1 || (
+            trace list.length(tx.inputs)
+            amount == 1 && 
+            list.any(
+              tx.inputs,
+              fn(input) { 
+                let target = from(input.output_reference)
+                trace @"target"
+                trace target
+                trace @"half_nft"
+                trace half_nft
+                trace @"nft"
+                trace nft
+                target == half_nft
+              },
+            ) && 
+            list.any(
+              tx.outputs,
+              fn(output) { 
+                output.address == svm_address && 
+                {
+                  let token_pairs =
+                    output.value
+                      |> assets.tokens(this_policy)
+                      |> dict.to_pairs
+                  when token_pairs is {
+                    [Pair(id_nft, 1)] -> {
+                      let datum = extraction_fn(output)
 
-                    this_policy == datum.id.policy && nft == datum.id.name && nft == id_nft && starting_fn(
-                      nexus_utxo,
-                      datum.id,
-                      datum.config,
-                      // redeemer,
-                      datum.state,
-                      output.value,
-                      this_policy,
-                      tx,
-                    )
+                      (this_policy == datum.id.policy)? && 
+                      (nft == datum.id.name && nft == id_nft)? && starting_fn(
+                        nexus_utxo,
+                        datum.id,
+                        datum.config,
+                        // redeemer,
+                        datum.state,
+                        output.value,
+                        this_policy,
+                        tx,
+                      )?
+                    }
+                    [] -> fail @"no tokens"
+                    _ -> fail @"too many tokens"
                   }
-                  [] -> fail @"no tokens"
-                  _ -> fail @"too many tokens"
-                }
-              } },
+                } 
+              },
+            )
           )
         },
       )

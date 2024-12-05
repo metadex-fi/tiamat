@@ -187,8 +187,8 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
    * @param spentSvms
    * @param trace
    */
-  public submitUntippedTx = async (
-    tx: TxSigned,
+  public submitUntippedTx = async <WT extends `servitor` | `owner`>(
+    tx: TxSigned<WT>,
     trace: Trace,
   ): Promise<Result> => {
     this.log(`submitting to pubsub`);

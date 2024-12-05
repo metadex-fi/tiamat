@@ -106,6 +106,9 @@ export class Token {
     const preimage = new Uint8Array(txId.length + 1);
     preimage[0] = Number(utxo.core.input().index());
     preimage.set(txId, 1);
+    console.log(
+      `Token.fromUtxo: preimage ${Core.toHex(preimage)} from ${utxo.core.input().transactionId()} ${utxo.core.input().index()}`,
+    );
     // Core.Hash32ByteBase16 is a hex string
     const utxoHashHex: Core.Hash32ByteBase16 = Core.blake2b_256(
       Core.toHex(preimage) as Core.HexBlob,

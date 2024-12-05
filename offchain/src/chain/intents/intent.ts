@@ -50,10 +50,9 @@ export abstract class Intent<
     ) => void, // callback to update frontend
     private readonly precons: Precon<DC, DP, any>[], // preconditions for the action-tx & their fixes if not met
     private readonly actionWallet: `servitor` | `owner`, // the wallet required to execute the payload of the action
-    private readonly fixTxAckCallback: Callback<TxId> | `no fix ACK`,
     private readonly sendActionTx: (
-      fixTx: TxCompleat | null, // in case we need something from there, i.e. the new nexus
-      actionBaseTx: Tx,
+      fixTx: TxCompleat<`servitor` | `owner`> | null, // in case we need something from there, i.e. the new nexus
+      actionBaseTx: Tx<`servitor`>,
       actionTxAckCallback: Callback<TxId>, // for status updates
       setAckTxId: (txId: TxId) => void, // for the ack-callback
       conflux: Conflux<ChoicesT, StatusT>,
@@ -112,19 +111,42 @@ export abstract class Intent<
     this.log(`discharging action semaphore`);
     this.user.actionSemaphore.discharge(actionId);
 
-    let fix: FixFoldPhase<DC, DP> = {
+    let confirmFixTx: (() => void) | null = null;
+    const fixTxConfirmation = new Promise<void>((resolve) => {
+      confirmFixTx = resolve;
+    });
+    const fixTxAckCallbackFn = (
+      txId: TxId,
+      trace: Trace,
+    ): Promise<[Result]> => {
+      const msg = `received ACK for fix tx with id: ${txId.txId}`;
+      this.log(msg);
+      assert(confirmFixTx !== null, `${this.name}: confirmFixTx is null`);
+      confirmFixTx();
+      return Promise.resolve([
+        new Result([msg], this.name, `fixTxAckCallbackFn`, trace),
+      ]);
+    };
+    const fixTxAckCallback = new Callback<TxId>(
+      `once`,
+      [this.name, `fixTxAckCallback`],
+      fixTxAckCallbackFn,
+    );
+
+    let fix: FixFoldPhase<DC, DP, `servitor` | `owner`> = {
       fixWallet: `ok` as `ok` | `servitor` | `owner`,
-      fixTx: (tx: Tx) => tx,
+      fixTx: (tx: Tx<`servitor` | `owner`>) => tx,
       utxoChainers: [] as ((utxos: UtxoSet) => {
         utxo: TraceUtxo;
         redeemer: Core.PlutusData | `coerce` | `supply`;
       }[])[],
+      setFixTxIds: [] as ((txId: TxId) => void)[],
     };
     this.precons.forEach((precon) => {
-      fix = precon.fixFold(fix, this.fixTxAckCallback);
+      fix = precon.fixFold(fix, fixTxAckCallback);
     });
     this.log(`${this.name} fixWallet: ${fix.fixWallet}`);
-    let fixTx: Tx | null = null;
+    let fixTx: Tx<`servitor` | `owner`> | null = null;
     switch (fix.fixWallet) {
       case `ok`:
         break;
@@ -151,7 +173,7 @@ export abstract class Intent<
       this.log(`setAckTxId: setting expectedTxId to`, txId);
       expectedTxId = txId;
     };
-    const actionAckCallbackFn = async (
+    const actionTxAckCallbackFn = async (
       txId: TxId,
       trace: Trace,
     ): Promise<[Result]> => {
@@ -174,10 +196,10 @@ export abstract class Intent<
       this.updateDisplay(this.conflux, this.status);
       return await Promise.resolve([result]);
     };
-    const actionAckCallback: Callback<TxId> = new Callback<TxId>(
+    const actionTxAckCallback: Callback<TxId> = new Callback<TxId>(
       `once`,
-      [this.name, `actionAckCallback`, `receiveAck`],
-      actionAckCallbackFn,
+      [this.name, `actionTxAckCallback`, `receiveAck`],
+      actionTxAckCallbackFn,
     );
 
     const trace = Trace.source(`SUB`, `${this.name}.execute_`);
@@ -188,16 +210,19 @@ export abstract class Intent<
           this.user.contract,
           trace,
         );
+        const fixTxId = TxId.fromTransaction(fixTxCompleat.tx);
+        fix.setFixTxIds.forEach((setFixTxId) => setFixTxId(fixTxId));
         const actionBaseTx = await fixTxCompleat.chain(
           this.user.getBlaze(this.actionWallet),
           fix.utxoChainers,
         );
         result.push(await submitFixTx());
+        await fixTxConfirmation;
         result.push(
           await this.sendActionTx(
             fixTxCompleat,
             actionBaseTx,
-            actionAckCallback,
+            actionTxAckCallback,
             setAckTxId,
             this.conflux,
             trace,
@@ -206,6 +231,8 @@ export abstract class Intent<
       } else {
         // default fix tx submit
         const fixTxCompleat = await fixTx.compleat();
+        const fixTxId = TxId.fromTransaction(fixTxCompleat.tx);
+        fix.setFixTxIds.forEach((setFixTxId) => setFixTxId(fixTxId));
         const actionBaseTx = await fixTxCompleat.chain(
           this.user.getBlaze(this.actionWallet),
           fix.utxoChainers,
@@ -214,11 +241,12 @@ export abstract class Intent<
         result.push(
           await this.user.contract.submitUntippedTx(fixTxSigned, trace),
         );
+        await fixTxConfirmation;
         result.push(
           await this.sendActionTx(
             fixTxCompleat,
             actionBaseTx,
-            actionAckCallback,
+            actionTxAckCallback,
             setAckTxId,
             this.conflux,
             trace,
@@ -231,7 +259,7 @@ export abstract class Intent<
         await this.sendActionTx(
           null,
           actionBaseTx,
-          actionAckCallback,
+          actionTxAckCallback,
           setAckTxId,
           this.conflux,
           trace,

@@ -394,7 +394,7 @@ export class TiamatSvm<
    *
    * @param tx
    */
-  public cleanUp = (tx: Tx): Tx => {
+  public cleanUp = <WT extends `servitor` | `owner`>(tx: Tx<WT>): Tx<WT> => {
     // this.dormantUtxos.forEach((utxo) => {
     //   tx = utxo.wipingTx(tx);
     // });

@@ -1,5 +1,5 @@
 import { Core } from "@blaze-cardano/sdk";
-import { Bech32Address, Tx, UtxoSet } from "../../../utils/wrappers";
+import { Bech32Address, Tx, TxId, UtxoSet } from "../../../utils/wrappers";
 import { Precon } from "../precon";
 import assert from "assert";
 import {
@@ -12,6 +12,8 @@ import { WalletFunds, Zygote } from "../../data/zygote";
 import { PDappConfigT, PDappParamsT } from "../../../types/tiamat/tiamat";
 import { min } from "../../../utils/generators";
 import { f } from "../../../types/general/fundamental/type";
+import { Callback } from "../../state/callback";
+import { Wallet } from "../../state/wallet";
 
 export class WalletsFundsStatus implements Zygote {
   public readonly ownerFunds: Map<Core.AssetId, bigint>;
@@ -65,6 +67,7 @@ export class ServitorPrecon<
   constructor(
     name: string,
     priorGanglion: Ganglion<any[], WalletsFundsStatus>,
+    servitorWallet: Wallet<`servitor`>,
     servitorAddress: Bech32Address,
   ) {
     name = `${name} ServitorPrecon`;
@@ -84,8 +87,21 @@ export class ServitorPrecon<
     // funds to fund the servitor-wallet come from the owner-wallet, naturally.
     const fixWallet = `owner`;
 
+    let fixTxAckCallback_: Callback<TxId>;
+    const setFixTxId = (fixTxId: TxId) => {
+      assert(
+        fixTxAckCallback_,
+        `ServitorPrecon.setFixTxId: fixTxAckCallback_ undefined`,
+      );
+      servitorWallet.subscribeAck(fixTxId, fixTxAckCallback_);
+    };
+
     // send some ADA from the owner-wallet to the servitor-wallet.
-    const fixTx = (tx: Tx, prior: WalletsFundsStatus): Tx => {
+    const fixTx = (
+      tx: Tx<`owner`>,
+      prior: WalletsFundsStatus,
+      fixTxAckCallback: Callback<TxId>,
+    ): Tx<`owner`> => {
       const ownerADA = prior.ownerFunds.get(`` as Core.AssetId) ?? 0n;
       const coveredNumTxFees = ownerADA / txFees - 1n; // -1n for the prefunding tx itself
       assert(
@@ -94,6 +110,9 @@ export class ServitorPrecon<
           (1n + minNumTxFees) * txFees
         }.\nOwner-funds: [${[...prior.ownerFunds.entries()].join(`, `)}]`,
       );
+
+      fixTxAckCallback_ = fixTxAckCallback;
+
       const prefundNumTxFees_ = min(coveredNumTxFees, prefundNumTxFees);
       return tx.payAssets(
         servitorAddress.blaze,
@@ -107,6 +126,6 @@ export class ServitorPrecon<
     // (that is handled by the regular chaining-mechanism).
     const chainUtxos = (_utxos: UtxoSet) => [];
 
-    super(priorGanglion, isMetBy, fixWallet, fixTx, chainUtxos);
+    super(priorGanglion, isMetBy, fixWallet, fixTx, chainUtxos, setFixTxId);
   }
 }

@@ -2,7 +2,7 @@ import assert from "assert";
 import { Simplephore } from "../agents/semaphore";
 import { UtxoEvent, UtxoEvents, UtxoSource } from "./utxoSource";
 import { Callback, Result } from "./callback";
-import { Bech32Address, Trace, Tx, UtxoSet } from "../../utils/wrappers";
+import { Bech32Address, Trace, Tx, TxId, UtxoSet } from "../../utils/wrappers";
 import {
   Blaze,
   Wallet as BlazeWallet,
@@ -25,6 +25,7 @@ export class Wallet<WT extends `servitor` | `owner`> {
   private readonly eventsSemaphore: Simplephore;
   private readonly eventQueue: UtxoEvents[] = [];
 
+  private ackCallbacks: Map<Core.TransactionId, Callback<TxId>[]> = new Map();
   private utxoSetCallbacks: Callback<UtxoSet>[] = [];
   private fundsCallbacks: Callback<Map<Core.AssetId, bigint>>[] = [];
 
@@ -68,10 +69,10 @@ export class Wallet<WT extends `servitor` | `owner`> {
           const eventsID = this.eventsSemaphore.latch(
             `${this.name}.constructor.subscribeToWalletUtxos`,
           );
-          this.processEvents([utxoEvents]);
+          this.processEvents([utxoEvents], trace);
           let nextEvents = this.eventQueue.splice(0);
           while (nextEvents.length) {
-            this.processEvents(nextEvents);
+            this.processEvents(nextEvents, trace);
             nextEvents = this.eventQueue.splice(0);
           }
           this.eventsSemaphore.discharge(eventsID);
@@ -92,6 +93,24 @@ export class Wallet<WT extends `servitor` | `owner`> {
       this.subscribeToAddressUtxos(forWalletOrAddress, callback);
     }
   }
+
+  /**
+   *
+   * @param ackCallback
+   * @param svmUtxo
+   */
+  public subscribeAck = (txId: TxId, ackCallback: Callback<TxId>) => {
+    assert(
+      ackCallback.perform === `once`,
+      `${this.name}: ackCallback must be 'once'`,
+    );
+    const ackCallbacks = this.ackCallbacks.get(txId.txId);
+    if (ackCallbacks) {
+      ackCallbacks.push(ackCallback);
+    } else {
+      this.ackCallbacks.set(txId.txId, [ackCallback]);
+    }
+  };
 
   /**
    *
@@ -137,7 +156,7 @@ export class Wallet<WT extends `servitor` | `owner`> {
     return result;
   };
 
-  public newTx = async (): Promise<Tx> => {
+  public newTx = async (): Promise<Tx<WT>> => {
     return new Tx(this.blaze, this.available.clone());
   };
 
@@ -276,14 +295,14 @@ export class Wallet<WT extends `servitor` | `owner`> {
    *
    * @param utxoEvents
    */
-  private processEvents = (utxoEvents: UtxoEvents[]) => {
+  private processEvents = (utxoEvents: UtxoEvents[], trace: Trace) => {
     for (const events of utxoEvents) {
       for (const event of events.events) {
         // assert(
         //   event.utxo.address === this.address,
         //   `${this.name} processEvents: wrong address:\n${event.utxo.address}\n!==\n${this.address}`
         // );
-        this.processEventUtxos(event);
+        this.processEventUtxos(event, trace);
         this.processEventFunds(event);
       }
     }
@@ -293,7 +312,7 @@ export class Wallet<WT extends `servitor` | `owner`> {
    *
    * @param event
    */
-  private processEventUtxos = (event: UtxoEvent) => {
+  private processEventUtxos = (event: UtxoEvent, trace: Trace) => {
     this.log(`processing event`, event);
     if (event.type === `create`) {
       const exists = this.available.list.some(
@@ -310,6 +329,7 @@ export class Wallet<WT extends `servitor` | `owner`> {
         event.utxo,
         Trace.source(`INPUT`, `Wallet.processEvent.create`),
       );
+      this.processAckCallbacks(event.utxo.input().transactionId(), trace);
     } else {
       assert(event.type === "destroy", `unexpected event type ${event.type}`);
       const available = this.available.except([event.utxo.input()]);
@@ -413,6 +433,17 @@ export class Wallet<WT extends `servitor` | `owner`> {
     this.fundsCallbacks = callbacks_;
     this.log(`keeping ${this.fundsCallbacks.length} fundsCallbacks`);
     return result;
+  };
+
+  private processAckCallbacks = (txId: Core.TransactionId, trace: Trace) => {
+    const ackCallbacks = this.ackCallbacks.get(txId);
+    if (ackCallbacks) {
+      this.ackCallbacks.delete(txId);
+      const transactionId = TxId.fromTransactionId(txId);
+      ackCallbacks.forEach((callback) => {
+        callback.run(transactionId, `${this.name}.processAckCallbacks`, trace);
+      });
+    }
   };
 
   /**

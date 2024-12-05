@@ -65,7 +65,7 @@ export class GenesisAction<DC extends PDappConfigT, DP extends PDappParamsT> {
   ): Promise<{
     nexusID: Token;
     matrixID: Token;
-    transactions: TxCompleat[];
+    transactions: TxCompleat<`owner`>[];
   }> => {
     // const utxos = await this.blaze.wallet.getUtxos(); //NOTE making an exception here
     const utxos = walletUtxos.clone();

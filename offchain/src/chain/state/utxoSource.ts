@@ -654,8 +654,8 @@ export class UtxoSource {
    * @param spentSvms
    * @param trace_
    */
-  public submitUntippedTx = async (
-    tx: TxSigned,
+  public submitUntippedTx = async <WT extends `servitor` | `owner`>(
+    tx: TxSigned<WT>,
     // ackCallback: Callback<TxId>,
     trace: Trace,
   ): Promise<Result> => {

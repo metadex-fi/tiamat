@@ -8,41 +8,42 @@ export interface StartingAction<
   DC extends PDappConfigT,
   DP extends PDappParamsT,
   _SvmUtxoT,
+  WT extends `servitor` | `owner`,
 > {
   startingTx(
-    tx: Tx,
+    tx: Tx<WT>,
     // submitCallback: Callback<TxId>,
     ackCallback: Callback<TxId>,
     utxos: UtxoSet,
     nexus?: NexusUtxo<DC, DP>,
-  ): Tx;
+  ): Tx<WT>;
 }
 
-export interface UnhingedAction<_SvmUtxoT> {
+export interface UnhingedAction<_SvmUtxoT, WT extends `servitor` | `owner`> {
   unhingedTx(
-    tx: Tx,
+    tx: Tx<WT>,
     // submitCallback: Callback<TxId>,
     ackCallback: Callback<TxId>,
     nexusUtxo: TraceUtxo,
-  ): Tx;
+  ): Tx<WT>;
 }
 
 export interface RevolvingAction<_SvmUtxoT> {
   revolvingTx(
-    tx: Tx,
+    tx: Tx<`servitor`>,
     // submitCallback: Callback<TxId>,
     ackCallback: Callback<TxId>,
     nexusUtxo: TraceUtxo,
-  ): Tx;
+  ): Tx<`servitor`>;
 }
 
-export interface HaltingAction<_SvmUtxoT> {
+export interface HaltingAction<_SvmUtxoT, WT extends `servitor` | `owner`> {
   haltingTx(
-    tx: Tx | Core.Transaction,
+    tx: Tx<WT> | Core.Transaction,
     // submitCallback: Callback<TxId>,
     ackCallback: Callback<TxId>,
     nexusUtxo?: TraceUtxo,
-  ): Tx;
+  ): Tx<WT>;
 }
 
 // type ActionType<T> = new (...args: any[]) => T;

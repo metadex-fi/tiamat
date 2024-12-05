@@ -79,6 +79,7 @@ export class ServitorPreconPlexus<
     this.servitorPrecon = new ServitorPrecon(
       user.name,
       this.walletsFundsGanglion,
+      user.servitorWallet,
       user.servitorAddress,
     );
   }

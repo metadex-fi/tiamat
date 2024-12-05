@@ -40,11 +40,11 @@ export class ElectionPrecon<
 
     // update the election state in the nexus.
     // NOTE/TODO we are ripping this from ElectAction, which we then should probably phase out once we're done
-    const fixTx = (
-      fixingTx: Tx,
+    const fixTx = <WT extends `servitor` | `owner`>(
+      fixingTx: Tx<WT>,
       prior: ElectionData<DC, DP>,
-      ackCallback: Callback<TxId> | `no fix ACK`,
-    ): Tx => {
+      ackCallback: Callback<TxId>,
+    ): Tx<WT> => {
       assert(prior.suitableForElection, `ElectAction: not suitableForElection`);
       const currentCycle = Interval.inclusive(prior.fromMs, prior.toMs);
       const action = new Void();
@@ -55,7 +55,6 @@ export class ElectionPrecon<
         currentCycle,
       );
       const newValue = prior.nexusUtxo.svmValue; // no change in value.
-      assert(ackCallback !== `no fix ACK`, `${name}: ackCallback not set`);
       const withElectionTx = prior.nexusUtxo
         .revolvingTx(
           fixingTx,
@@ -97,15 +96,15 @@ export class ElectionPrecon<
     // needs to be signed by each clique of the new electorate, and submitted accordingly as multiple txes.
     const mkDivergentFixSubmit =
       (prior: ElectionData<DC, DP>) =>
-      async (
-        fixingTx: Tx,
+      async <WT extends `servitor` | `owner`>(
+        fixingTx: Tx<WT>,
         contract: TiamatContract<DC, DP>,
         trace: Trace,
       ): Promise<{
-        fixTxCompleat: TxCompleat; // for chaining the action-tx
+        fixTxCompleat: TxCompleat<WT>; // for chaining the action-tx
         submitFixTx: () => Promise<Result>;
       }> => {
-        let fixTxCompleat: TxCompleat | null = null;
+        let fixTxCompleat: TxCompleat<WT> | null = null;
         const electionTxes: CliqueElectionTx[] = [];
 
         const supportVectorSets = computeSubsets(
@@ -159,6 +158,7 @@ export class ElectionPrecon<
       fixWallet,
       fixTx,
       chainUtxos,
+      undefined,
       mkDivergentFixSubmit,
     );
   }

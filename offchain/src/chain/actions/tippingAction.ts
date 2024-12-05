@@ -89,7 +89,7 @@ export class TippingAction {
     public readonly eigenvectors: EigenValue[],
     public readonly numSupportVectors: bigint,
     public readonly tip: bigint,
-    public readonly payloadTx: Tx,
+    public readonly payloadTx: Tx<`servitor`>,
   ) {
     // assert(userUtxos.length, `TippingAction: userUtxos empty`);
     assert(
@@ -196,7 +196,7 @@ export class TippingAction {
       console.log(`TippingAction: adding signerKey\n    ${vectorSignerKey}`);
       payloadTx = payloadTx.addRequiredSigner(vectorSignerKey);
     });
-    let tippedActionCompleat: TxCompleat;
+    let tippedActionCompleat: TxCompleat<`servitor`>;
     try {
       tippedActionCompleat = await payloadTx.compleat();
     } catch (e) {

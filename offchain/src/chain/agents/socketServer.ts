@@ -2019,8 +2019,8 @@ export class SocketServer<
     const trace_ = trace.via(`${this.name}.syncEigenValue`);
     const eigenValues = matrix.svmDatum.state.eigen_values;
     const eigenwert = matrix.svmDatum.config.eigenwert;
-    let firstTx: TxCompleat | undefined;
-    let tx: Tx | undefined;
+    let firstTx: TxCompleat<`owner`> | undefined;
+    let tx: Tx<`owner`> | undefined;
     // let matrixUtxo: MatrixUtxo | undefined;
     // let vestingUtxo: VestingUtxo | undefined;
     let nexusUtxo: TraceUtxo;
@@ -2132,7 +2132,7 @@ export class SocketServer<
       ) {
         const vector = KeyHash.fromBlaze(this.ownPublicKeyHash);
         let matrix_ = matrix;
-        let tx_: Tx | TxCompleat | undefined;
+        let tx_: Tx<`owner`> | TxCompleat<`owner`> | undefined;
         if (tx) {
           firstTx = await tx.compleat();
           matrix_ = TiamatSvmUtxo.singletonAfterTx(

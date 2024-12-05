@@ -17,7 +17,9 @@ const slotDurationMs_ = BigInt(slotDurationMs);
  *
  */
 export class ClaimStakeAction
-  implements UnhingedAction<VestingUtxo>, HaltingAction<VestingUtxo>
+  implements
+    UnhingedAction<VestingUtxo, `owner`>,
+    HaltingAction<VestingUtxo, `owner`>
 {
   public readonly action = new Void();
   public readonly halt: boolean;
@@ -72,11 +74,11 @@ export class ClaimStakeAction
    * @param nexusUtxo
    */
   public unhingedTx = (
-    tx: Tx,
+    tx: Tx<`owner`>,
     // submitCallback: Callback<TxId>,
     ackCallback: Callback<TxId>,
     nexusUtxo: TraceUtxo,
-  ): Tx => {
+  ): Tx<`owner`> => {
     console.log(`ClaimStakeAction.unhingedTx`);
     assert(!this.halt, `ClaimStakeAction.unhingedTx: halting`);
     assert(
@@ -115,10 +117,10 @@ export class ClaimStakeAction
    * @param ackCallback
    */
   public haltingTx = (
-    tx: Tx,
+    tx: Tx<`owner`>,
     // submitCallback: Callback<TxId>,
     ackCallback: Callback<TxId>,
-  ): Tx => {
+  ): Tx<`owner`> => {
     console.log(`ClaimStakeAction.haltingTx`);
     assert(this.halt, `ClaimStakeAction.haltingTx: not halting`);
     assert(

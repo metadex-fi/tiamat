@@ -391,16 +391,16 @@ export class SocketKupmios implements ChainInterface {
   public applyTxToLedger = async (
     tx: Core.Transaction, // common denominator of TxSigned (our own) and Core.TxCBOR (from the wire)
     updateOutputs: boolean, // for tipping-tx we got ambiguity, so we don't create utxos here
-    trace2: Trace,
+    trace: Trace,
   ): Promise<Result> => {
-    const trace_ = trace2.via(`${this.name}.applyTxToLedger`);
+    const trace_ = trace.via(`${this.name}.applyTxToLedger`);
     const destroyed = UtxoSet.empty();
     const inputs = tx.body().inputs().values();
     for (const input of inputs) {
       const utxo = this.localUtxos.get(input);
       assert(
         utxo,
-        `${this.name}.applyTxToLedger: input not found in ledger: ${input}`,
+        `${this.name}.applyTxToLedger: input not found in ledger: ${input.transactionId()}:${input.index()}`,
       );
       destroyed.insertNew(utxo.core, utxo.trace);
     }
