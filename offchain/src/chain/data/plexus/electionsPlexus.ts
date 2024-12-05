@@ -194,7 +194,7 @@ export class CurrentElectionEffector<
     name: string,
     updateConnections: (
       election: ElectionData<DC, DP>,
-      trace2: Trace,
+      trace: Trace,
     ) => Promise<Result>, // TODO
   ) {
     name = `${name} CurrentElectionEffector`;
@@ -225,7 +225,7 @@ export class CurrentElectionEffector<
       [name, `connect`],
       connect,
     );
-    super(`CurrentElectionEffector`, currentElectionEffect);
+    super(name, currentElectionEffect);
   }
 }
 
@@ -276,11 +276,17 @@ export class NextElectionEffector<
           ];
         case `less than one block`:
           this.doubleMarginTimeout = setTimeout(
-            () => prepareForConnections(data, trace_),
+            () =>
+              prepareForConnections(data, trace_).then((result) =>
+                result.burn().forEach((msg) => this.log(msg)),
+              ),
             phase.untilDoubleMarginMs,
           );
           this.singleMarginTimeout = setTimeout(
-            () => updateConnections(data, trace_),
+            () =>
+              updateConnections(data, trace_).then((result) =>
+                result.burn().forEach((msg) => this.log(msg)),
+              ),
             phase.untilSingleMarginMs,
           );
           return [
@@ -293,7 +299,10 @@ export class NextElectionEffector<
           ];
         case `within double margin`:
           this.singleMarginTimeout = setTimeout(
-            () => updateConnections(data, trace_),
+            () =>
+              updateConnections(data, trace_).then((result) =>
+                result.burn().forEach((msg) => this.log(msg)),
+              ),
             phase.untilSingleMarginMs,
           );
           return [await prepareForConnections(data, trace_)];
@@ -319,7 +328,7 @@ export class NextElectionEffector<
       [name, `connect`],
       discernMargins,
     );
-    super(`NextElectionEffector`, nextElectionEffect);
+    super(name, nextElectionEffect);
   }
 }
 

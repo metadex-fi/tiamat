@@ -823,6 +823,7 @@ export class SocketServer<
 
   private maybeAcceptConnections = async (
     election: ElectionData<DC, DP>,
+    trace: Trace,
   ): Promise<Result> => {
     const firstOwnIndex = election.eligibleEVs.findIndex(
       (ev) => ev.vector.toBlaze() === this.ownPublicKeyHash,
@@ -847,12 +848,7 @@ export class SocketServer<
       }
     }
     this.log(msg);
-    return new Result(
-      [msg],
-      this.name,
-      `maybeAcceptConnections`,
-      Trace.source(`SOCKET`, `${this.name}.maybeAcceptConnections`),
-    );
+    return new Result([msg], this.name, `maybeAcceptConnections`, trace);
   };
 
   private updateElectionConnections = async (
@@ -877,7 +873,7 @@ export class SocketServer<
         [`updateElectionConnections: not eligible`],
         this.name,
         `updateElectionConnections`,
-        trace_,
+        trace,
       );
     } else {
       assert(
@@ -910,7 +906,7 @@ export class SocketServer<
       [`connections updated`],
       this.name,
       `updateElectionConnections`,
-      trace_,
+      trace,
     );
   };
 

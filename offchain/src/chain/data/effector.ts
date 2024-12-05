@@ -22,4 +22,13 @@ export class Effector<InZT extends Zygote> {
       trace.via(`${this.name}.induce from ${from}`),
     );
   };
+
+  /**
+   *
+   * @param msg
+   * @param {...any} args
+   */
+  protected log = (msg: string, ...args: any) => {
+    console.log(`[${this.name}] ${msg}`, ...args, `\n`);
+  };
 }

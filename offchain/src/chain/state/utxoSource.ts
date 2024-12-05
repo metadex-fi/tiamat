@@ -436,12 +436,12 @@ export class UtxoSource {
    * @param trace_
    */
   public notifyUtxoEvents = async (
-    from: ChainInterface | this,
+    from: ChainInterface,
     events: UtxoEvents,
     trace: Trace,
   ): Promise<Result> => {
     assert(
-      from === this.chainInterface || from === this,
+      from === this.chainInterface,
       `${this.name}: notifyUtxoEvents from wrong chainInterface`,
     );
     const trace_ = trace.via(`${this.name}.notifyUtxoEvents`);

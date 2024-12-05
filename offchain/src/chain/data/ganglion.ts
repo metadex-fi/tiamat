@@ -80,8 +80,14 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
     assert(this.myelinated, `${this.name}.induce: Ganglion not myelinated`);
     // this.abortController?.abort(); // TODO FIXME
     this.abortController = new AbortController();
-    // NOTE not awaiting this.process on purpose, so we can move on
-    this.process(this.abortController.signal, trace.via(`${this.name}.induce`));
+    // NOTE not awaiting this.process on purpose, so we can move on (TODO FIXME)
+    // return await this.process(this.abortController.signal, trace.via(`${this.name}.induce`))
+    this.process(
+      this.abortController.signal,
+      trace.via(`${this.name}.induce`),
+    ).then((result) => {
+      result.burn().forEach((msg) => this.log(msg));
+    });
     return await Promise.resolve(
       new Result([`Induced`], this.name, `induce`, trace),
     );
@@ -141,13 +147,17 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
    * Process upstream data updates.
    * @param signal
    */
-  private process = async (signal: AbortSignal, trace: Trace) => {
+  private process = async (
+    signal: AbortSignal,
+    trace: Trace,
+  ): Promise<Result> => {
+    const trace_ = trace.via(`${this.name}.process`);
     if (this.processSemaphore.busy) {
       this.doubleTapped = true;
-      return;
+      return new Result([`Busy`], this.name, `sense`, trace_);
     }
     const processID = this.processSemaphore.latch(`process`);
-    const trace_ = trace.via(`${this.name}.process`);
+    const result: (Result | string)[] = [];
     while (true) {
       try {
         this.log(`Processing`, trace_.compose());
@@ -177,7 +187,8 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
           } else {
             this.log(`State changed:\n`, this.current, `\n\t⬇\n`, newState);
             this.current = newState;
-            this.induceEfferents(newState, trace_);
+            const result_ = await this.induceEfferents(newState, trace_);
+            result.push(...result_);
           }
         }
       } catch (e) {
@@ -191,7 +202,7 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
         this.doubleTapped = false;
       } else {
         this.processSemaphore.discharge(processID);
-        return;
+        return new Result(result, this.name, `process`, trace_);
       }
     }
   };
@@ -203,7 +214,7 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
   protected induceEfferents = async (
     data: OutZT,
     trace: Trace,
-  ): Promise<void> => {
+  ): Promise<Result[]> => {
     this.log(
       `Inducing efferents:\n`,
       this.efferents.map((e) => e.name),
@@ -221,7 +232,8 @@ export class Ganglion<InZsT extends readonly Zygote[], OutZT extends Zygote> {
       ),
     ];
     const result = await Promise.all(inductionPromises);
-    result.forEach((r) => r.burn().forEach((msg) => this.log(msg)));
+    // result.forEach((r) => r.burn().forEach((msg) => this.log(msg)));
+    return result;
   };
 
   /**

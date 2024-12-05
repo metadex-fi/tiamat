@@ -13,6 +13,7 @@ import { ErrorTimeout } from "../../utils/errorTimeout";
 
 export class Result {
   readonly __brand = `Result`;
+  declare __mustUse: never;
   private burned = false;
   private timeout?: ErrorTimeout;
   private readonly messages: string[];
@@ -59,11 +60,7 @@ export class Callback<T> {
   public readonly fullName: string;
   private readonly shortName: string; // use fullName
   static count = 0;
-  public readonly run: (
-    data: T,
-    from: string,
-    trace2: Trace,
-  ) => Promise<Result>;
+  public readonly run: (data: T, from: string, trace: Trace) => Promise<Result>;
   // public readonly name: string;
   /**
    *
@@ -74,7 +71,7 @@ export class Callback<T> {
   constructor(
     public readonly perform: `once` | `always`,
     id: (string | undefined)[],
-    callback: (data: T, trace2: Trace) => Promise<(Result | string | Sent)[]>,
+    callback: (data: T, trace: Trace) => Promise<(Result | string | Sent)[]>,
   ) {
     const count = Callback.count++;
     const id_ = id.filter((id) => id !== undefined);
@@ -97,7 +94,7 @@ export class Callback<T> {
      * @param from
      * @param trace
      */
-    this.run = async (data: T, from: string, trace: Trace) => {
+    this.run = async (data: T, from: string, trace: Trace): Promise<Result> => {
       if (logCallbacks) {
         console.log(
           trace.calledFrom(this.fullName, from).toString(),
@@ -144,11 +141,7 @@ export class Callback<T> {
       if (logCallbacks) {
         console.log(`${this.fullName} DONE\n`);
       }
-      if (result instanceof Result) {
-        return result;
-      } else {
-        return new Result(result, this.shortName, from, trace);
-      }
+      return new Result(result, this.fullName, from, trace);
     };
   }
 

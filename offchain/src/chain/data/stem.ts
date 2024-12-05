@@ -1,7 +1,7 @@
 import { Core } from "@blaze-cardano/sdk";
 import { PData } from "../../types/general/fundamental/type";
 import { Trace, UtxoSet } from "../../utils/wrappers";
-import { Callback } from "../state/callback";
+import { Callback, Result } from "../state/callback";
 import { TiamatSvm } from "../state/tiamatSvm";
 import { TiamatSvmUtxo } from "../state/tiamatSvmUtxo";
 import { Wallet } from "../state/wallet";
@@ -49,14 +49,14 @@ class Stem<PerceptT, ZT extends Zygote> extends Ganglion<ZT[], ZT> {
   protected sense = async (
     percept: PerceptT,
     trace: Trace,
-  ): Promise<string[]> => {
+  ): Promise<[Result]> => {
+    const trace_ = trace.via(`${this.name}.sense`);
     if (this.processSemaphore.busy) {
       this.doubleTapped = true;
-      return [`${this.name}: Busy`];
+      return [new Result([`Busy`], this.name, `sense`, trace_)];
     }
     const processID = this.processSemaphore.latch(`process`);
-    const result: string[] = [];
-    const trace_ = trace.via(`${this.name}.sense`);
+    const result: (Result | string)[] = [];
     while (true) {
       try {
         const trace__ = trace_.compose();
@@ -64,7 +64,7 @@ class Stem<PerceptT, ZT extends Zygote> extends Ganglion<ZT[], ZT> {
         const perception = await this.sensing(percept, trace_);
         if (this.current !== `virginal` && this.current.equals(perception)) {
           this.log(`No change in perception:`, this.current);
-          result.push(`${this.name}: No change in perception`);
+          result.push(`No change in perception`);
         } else {
           this.log(
             `Perception changed:\n`,
@@ -73,22 +73,24 @@ class Stem<PerceptT, ZT extends Zygote> extends Ganglion<ZT[], ZT> {
             perception,
           );
           this.current = perception;
-          this.induceEfferents(perception, trace_);
-          result.push(`${this.name}: Perception changed`);
+          const result_ = await this.induceEfferents(perception, trace_);
+          result.push(...result_);
+          result.push(`Perception changed`);
         }
       } catch (e) {
         if ((e as Error).name === `AbortError`) {
           this.log(`Procedure aborted: ${e}`);
+          result.push(`Procedure aborted`);
         } else {
           this.throw(`Error during procedure: ${e}`);
+          result.push(`Error during procedure`);
         }
-        result.push(`${this.name}: Error during procedure`);
       }
       if (this.doubleTapped) {
         this.doubleTapped = false;
       } else {
         this.processSemaphore.discharge(processID);
-        return result;
+        return [new Result(result, this.name, `sense`, trace_)];
       }
     }
   };

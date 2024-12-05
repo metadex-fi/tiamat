@@ -462,12 +462,7 @@ export abstract class TiamatUser<
       this.marginLockIds = { actionId, lockId };
       result = `lockDuringMargins: margin lock latched`;
     }
-    return new Result(
-      [result],
-      this.name,
-      `lockDuringMargins`,
-      trace.via(`${this.name}.lockDuringMargins`),
-    );
+    return new Result([result], this.name, `lockDuringMargins`, trace);
   };
 
   public newTx = async (ofWallet: `servitor` | `owner`): Promise<Tx> => {

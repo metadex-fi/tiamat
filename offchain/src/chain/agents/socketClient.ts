@@ -151,7 +151,7 @@ export class SocketClient implements ChainInterface {
         [`connections updated`],
         this.name,
         `updateConnections`,
-        trace.via(`${this.name}.updateConnections`),
+        trace,
       ),
     );
   };
