@@ -245,10 +245,13 @@ export class NextElectionEffector<
   private singleMarginTimeout?: NodeJS.Timeout;
   constructor(
     name: string,
-    prepareForConnections: (election: ElectionData<DC, DP>) => Promise<Result>, // TODO
+    prepareForConnections: (
+      election: ElectionData<DC, DP>,
+      trace: Trace,
+    ) => Promise<Result>, // TODO
     updateConnections: (
       election: ElectionData<DC, DP>,
-      trace2: Trace,
+      trace: Trace,
     ) => Promise<Result>, // TODO
   ) {
     name = `${name} NextElectionEffector`;
@@ -273,7 +276,7 @@ export class NextElectionEffector<
           ];
         case `less than one block`:
           this.doubleMarginTimeout = setTimeout(
-            () => prepareForConnections(data),
+            () => prepareForConnections(data, trace_),
             phase.untilDoubleMarginMs,
           );
           this.singleMarginTimeout = setTimeout(
@@ -293,13 +296,13 @@ export class NextElectionEffector<
             () => updateConnections(data, trace_),
             phase.untilSingleMarginMs,
           );
-          return [await prepareForConnections(data)];
+          return [await prepareForConnections(data, trace_)];
         case `within single margin`:
           return [
             new Result(
               (
                 await Promise.all([
-                  prepareForConnections(data),
+                  prepareForConnections(data, trace_),
                   updateConnections(data, trace_),
                 ])
               ).flat(),
@@ -311,12 +314,12 @@ export class NextElectionEffector<
       }
     };
 
-    const currentElectionEffect = new Callback(
+    const nextElectionEffect = new Callback(
       `always`,
       [name, `connect`],
       discernMargins,
     );
-    super(`NextElectionEffector`, currentElectionEffect);
+    super(`NextElectionEffector`, nextElectionEffect);
   }
 }
 
@@ -393,10 +396,13 @@ export class ElectionsPlexus<
   }
 
   public innervateMarginEffectors = (
-    prepareForConnections: (election: ElectionData<DC, DP>) => Promise<Result>,
+    prepareForConnections: (
+      election: ElectionData<DC, DP>,
+      trace: Trace,
+    ) => Promise<Result>,
     updateConnections: (
       election: ElectionData<DC, DP>,
-      trace2: Trace,
+      trace: Trace,
     ) => Promise<Result>,
   ) => {
     assert(

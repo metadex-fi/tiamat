@@ -100,16 +100,16 @@ export class Wallet {
     stem: WalletUtxosStem,
     callback: Callback<UtxoSet>,
   ): Promise<Result> => {
-    this.log(`subscribing to utxo set:`, callback.show());
+    this.log(`innervating utxo stem:`, callback.show());
     assert(
       stem instanceof WalletUtxosStem,
-      `${this.name}.subscribeToUtxoSet: expected WalletUtxosStem`,
+      `${this.name}.innervateUtxosStem: expected WalletUtxosStem`,
     );
     this.utxoSetCallbacks.push(callback);
     const result = await callback.run(
       this.available,
-      `${this.name}.subscribe.catchUp`,
-      Trace.source(`SUB`, `${this.name}.subscribe`),
+      `${this.name}.innervateUtxosStem.catchUp`,
+      Trace.source(`SUB`, `${this.name}.innervateUtxosStem.catchUp`),
     );
     return result;
   };
@@ -122,16 +122,16 @@ export class Wallet {
     stem: WalletFundsStem,
     callback: Callback<Map<Core.AssetId, bigint>>,
   ): Promise<Result> => {
-    this.log(`subscribing to funds:`, callback.show());
+    this.log(`innervating funds stem:`, callback.show());
     assert(
       stem instanceof WalletFundsStem,
-      `${this.name}.subscribeToFunds: expected WalletFundsStem`,
+      `${this.name}.innervateFundsStem: expected WalletFundsStem`,
     );
     this.fundsCallbacks.push(callback);
     const result = await callback.run(
       this.funds,
-      `${this.name}.subscribe.catchUp`,
-      Trace.source(`SUB`, `${this.name}.subscribe`),
+      `${this.name}.innervateFundsStem.catchUp`,
+      Trace.source(`SUB`, `${this.name}.innervateFundsStem.catchUp`),
     );
     return result;
   };
@@ -212,7 +212,7 @@ export class Wallet {
 
     if (this.subscribedToWallets) return;
     this.subscribedToWallets = true;
-    this.utxoSource.subscribeToNewBlock(
+    const result = await this.utxoSource.subscribeToNewBlock(
       this,
       new Callback(
         `always`,
@@ -238,6 +238,7 @@ export class Wallet {
         },
       ),
     );
+    result.burn().forEach((msg) => this.log(msg));
   };
 
   /**

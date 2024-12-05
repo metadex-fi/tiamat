@@ -337,7 +337,7 @@ export abstract class TiamatUser<
       `${this.name}.initBlockfrostMatrixNexus: expected exactly one matrix- and nexus-utxo, got ${matrixUtxos.length} matix- and ${nexusUtxos.length} nexus-utxos`,
     );
 
-    await this.contract.utxoSource.initialNotifyUtxoEvents(
+    const result = await this.contract.utxoSource.initialNotifyUtxoEvents(
       UtxoSet.fromList([
         {
           core: matrixUtxos[0]!,
@@ -350,6 +350,8 @@ export abstract class TiamatUser<
       ]),
       Trace.source(`INIT`, `${this.name}.initBlockfrostMatrixNexus`),
     );
+
+    result.burn().forEach((r) => this.log(r));
   };
 
   /**
@@ -439,6 +441,7 @@ export abstract class TiamatUser<
 
   protected lockDuringMargins = async (
     _election: ElectionData<DC, DP>,
+    trace: Trace,
   ): Promise<Result> => {
     assert(
       !this.marginLockIds,
@@ -446,7 +449,7 @@ export abstract class TiamatUser<
     );
     let result: string;
     if (this.lockSemaphore.busy) {
-      result = `${this.name}.lockDuringMargins: lockSemaphore busy, skipping double lock`;
+      result = `lockDuringMargins: lockSemaphore busy, skipping double lock`;
     } else {
       const lockId = this.lockSemaphore.latch(
         `lockDuringMargins`,
@@ -457,13 +460,13 @@ export abstract class TiamatUser<
         `no timeout`,
       ); // TODO timeout from election
       this.marginLockIds = { actionId, lockId };
-      result = `${this.name}.lockDuringMargins: margin lock latched`;
+      result = `lockDuringMargins: margin lock latched`;
     }
     return new Result(
       [result],
       this.name,
       `lockDuringMargins`,
-      Trace.source(`AUTO`, `${this.name}.lockDuringMargins`),
+      trace.via(`${this.name}.lockDuringMargins`),
     );
   };
 
