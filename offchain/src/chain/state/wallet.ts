@@ -196,7 +196,6 @@ export class Wallet<WT extends `servitor` | `owner`> {
       if we get a full wallet with potentially multiple addresses,
       we instead subscribe to that.
       */
-    this.log(`subscribed to utxos of single address`);
     this.subscribeToAddress(address, callback);
   };
 
@@ -271,7 +270,10 @@ export class Wallet<WT extends `servitor` | `owner`> {
     callback: Callback<UtxoEvents>,
   ) => {
     const concise = address.concise();
-    this.log(`subscribed to utxos of ${concise}`);
+    this.log(
+      `subscribed to utxos of ${concise} with vkey hash:`,
+      address.blaze.asBase()?.getPaymentCredential().hash,
+    );
     this.utxoSource.subscribeToAddress(
       this,
       address,
@@ -441,7 +443,9 @@ export class Wallet<WT extends `servitor` | `owner`> {
       this.ackCallbacks.delete(txId);
       const transactionId = TxId.fromTransactionId(txId);
       ackCallbacks.forEach((callback) => {
-        callback.run(transactionId, `${this.name}.processAckCallbacks`, trace);
+        callback
+          .run(transactionId, `${this.name}.processAckCallbacks`, trace)
+          .then((result) => result.burn().forEach((msg) => this.log(msg)));
       });
     }
   };

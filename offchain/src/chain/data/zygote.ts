@@ -60,6 +60,36 @@ export class WalletFunds<WT extends `servitor` | `owner`> implements Zygote {
   };
 }
 
+export class SvmUtxos<
+  PConfig extends PData,
+  PState extends PData,
+  PAction extends PData,
+> implements Zygote
+{
+  constructor(
+    public readonly utxos: TiamatSvmUtxo<PConfig, PState, PAction>[],
+  ) {}
+
+  public equals = (other: SvmUtxos<PConfig, PState, PAction>): boolean => {
+    if (this.utxos === other.utxos) {
+      return true;
+    } else if (this.utxos.length !== other.utxos.length) {
+      return false;
+    } else {
+      for (let i = 0; i < this.utxos.length; i++) {
+        if (!this.utxos[i]!.sameUtxo(other.utxos[i]!)) {
+          return false;
+        }
+      }
+      return true;
+    }
+  };
+
+  public show = (_tabs = ``): string => {
+    return `SvmUtxos: ${this.utxos}`;
+  };
+}
+
 export class MaybeSvmUtxo<
   PConfig extends PData,
   PState extends PData,

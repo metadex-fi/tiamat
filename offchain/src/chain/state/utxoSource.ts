@@ -110,11 +110,11 @@ export interface ChainInterface {
   ) => void;
   subscribeToNewBlock: (subscriber: UtxoSource) => void;
   // subscribeToAck: (subscriber: UtxoSource) => void;
-  submitUntippedTx: (tx: Core.Transaction, trace2: Trace) => Promise<Result>;
-  submitTippedTxes: (txes: CliqueTippedTx[], trace2: Trace) => Promise<Result>;
+  submitUntippedTx: (tx: Core.Transaction, trace: Trace) => Promise<Result>;
+  submitTippedTxes: (txes: CliqueTippedTx[], trace: Trace) => Promise<Result>;
   submitElectionTxes: (
     txes: CliqueElectionTx[],
-    trace2: Trace,
+    trace: Trace,
   ) => Promise<Result>;
 }
 

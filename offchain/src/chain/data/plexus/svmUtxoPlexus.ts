@@ -14,7 +14,12 @@ export class SvmUtxoPlexus<
   PState extends PData,
   PAction extends PData,
 > extends Plexus {
-  public readonly svmUtxoStem: SvmStem<PConfig, PState, PAction>;
+  public readonly svmUtxoStem: SvmStem<
+    PConfig,
+    PState,
+    PAction,
+    MaybeSvmUtxo<PConfig, PState, PAction>
+  >;
 
   constructor(
     svm: TiamatSvm<PConfig, PState, PAction>,

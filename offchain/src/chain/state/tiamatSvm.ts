@@ -32,6 +32,7 @@ import { Hash } from "../../types/general/derived/hash/hash";
 import { Token } from "../../types/general/derived/asset/token";
 import { PDappConfigT, PDappParamsT } from "../../types/tiamat/tiamat";
 import { SvmStem } from "../data/stem";
+import { Zygote } from "../data/zygote";
 
 /**
  *
@@ -163,8 +164,8 @@ export class TiamatSvm<
    * @param callback
    * @param tolerance
    */
-  public subscribe = async (
-    subscriber: SvmStem<PConfig, PState, PAction>,
+  public subscribe = async <OutZT extends Zygote>(
+    subscriber: SvmStem<PConfig, PState, PAction, OutZT>,
     callback: Callback<TiamatSvmUtxo<PConfig, PState, PAction>[]>,
     tolerance = 0,
   ): Promise<Result> => {

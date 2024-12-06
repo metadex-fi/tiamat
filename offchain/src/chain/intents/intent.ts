@@ -9,6 +9,7 @@ import {
   Tx,
   TxCompleat,
   TxId,
+  TxSigned,
   UtxoSet,
 } from "../../utils/wrappers";
 import { TiamatUser } from "../agents/tiamatUser";
@@ -49,14 +50,14 @@ export abstract class Intent<
       status: `choosing` | `pending` | `success` | `failure` | `retrying`,
     ) => void, // callback to update frontend
     private readonly precons: Precon<DC, DP, any>[], // preconditions for the action-tx & their fixes if not met
-    private readonly actionWallet: `servitor` | `owner`, // the wallet required to execute the payload of the action
+    private readonly actionWallet: `servitor`, // | `owner`, // the wallet required to execute the payload of the action
     private readonly sendActionTx: (
       fixTx: TxCompleat<`servitor` | `owner`> | null, // in case we need something from there, i.e. the new nexus
       actionBaseTx: Tx<`servitor`>,
       actionTxAckCallback: Callback<TxId>, // for status updates
-      setAckTxId: (txId: TxId) => void, // for the ack-callback
+      setActionAckTxId: (txId: TxId) => void, // for the ack-callback
       conflux: Conflux<ChoicesT, StatusT>,
-      trace2: Trace,
+      trace: Trace,
     ) => Promise<Result>, // construct action-tx, add tips (if applicable), compleat, sign, submit, etc.
   ) {
     this.conflux = this.mkConflux(mkDefaultChoices(), defaultStatus);
@@ -119,7 +120,7 @@ export abstract class Intent<
       txId: TxId,
       trace: Trace,
     ): Promise<[Result]> => {
-      const msg = `received ACK for fix tx with id: ${txId.txId}`;
+      const msg = `fixTxAckCallbackFn: received ACK:\n <~~ ${txId.txId}`;
       this.log(msg);
       assert(confirmFixTx !== null, `${this.name}: confirmFixTx is null`);
       confirmFixTx();
@@ -164,31 +165,27 @@ export abstract class Intent<
     // const trace = Trace.source(`SUB`, this.name);
 
     // TODO some sort of timeout
-    let expectedTxId: TxId | null = null;
-    const setAckTxId = (txId: TxId) => {
+    let expectedActionTxId: TxId | null = null;
+    const setActionAckTxId = (txId: TxId) => {
       assert(
-        expectedTxId === null,
-        `${this.name}.setAckTxId: expected txId already set to ${expectedTxId} but tried to set it to ${txId}`,
+        expectedActionTxId === null,
+        `${this.name}.setAckTxId: expected txId already set to ${expectedActionTxId} but tried to set it to ${txId}`,
       );
       this.log(`setAckTxId: setting expectedTxId to`, txId);
-      expectedTxId = txId;
+      expectedActionTxId = txId;
     };
     const actionTxAckCallbackFn = async (
       txId: TxId,
       trace: Trace,
     ): Promise<[Result]> => {
-      this.log(`actionAckCallbackFn: received ACK:\n <~~`, txId.txId);
-      const result = new Result(
-        [`ACK: ${txId.txId}`],
-        this.name,
-        `execute_`,
-        trace,
-      );
+      const msg = `actionAckCallbackFn: received ACK:\n <~~ ${txId.txId}`;
+      this.log(msg);
+      const result = new Result([msg], this.name, `actionAckCallbackFn`, trace);
       assert(
-        expectedTxId,
+        expectedActionTxId,
         `${this.name}.actionAckCallbackFn: expectedTxId not set`,
       );
-      if (expectedTxId.txId === txId.txId) {
+      if (expectedActionTxId.txId === txId.txId) {
         this.status = `success`;
       } else {
         this.status = `failure`; // TODO retry
@@ -223,7 +220,7 @@ export abstract class Intent<
             fixTxCompleat,
             actionBaseTx,
             actionTxAckCallback,
-            setAckTxId,
+            setActionAckTxId,
             this.conflux,
             trace,
           ),
@@ -247,7 +244,7 @@ export abstract class Intent<
             fixTxCompleat,
             actionBaseTx,
             actionTxAckCallback,
-            setAckTxId,
+            setActionAckTxId,
             this.conflux,
             trace,
           ),
@@ -260,7 +257,7 @@ export abstract class Intent<
           null,
           actionBaseTx,
           actionTxAckCallback,
-          setAckTxId,
+          setActionAckTxId,
           this.conflux,
           trace,
         ),

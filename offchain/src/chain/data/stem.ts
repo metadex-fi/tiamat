@@ -41,7 +41,7 @@ const neverProcedure = async <ZT extends Zygote>(
 class Stem<PerceptT, ZT extends Zygote> extends Ganglion<ZT[], ZT> {
   constructor(
     name: string,
-    private readonly sensing: (percept: PerceptT, trace2: Trace) => Promise<ZT>,
+    private readonly sensing: (percept: PerceptT, trace: Trace) => Promise<ZT>,
   ) {
     super(name, [], neverProcedure);
   }
@@ -103,17 +103,15 @@ export class SvmStem<
   PConfig extends PData,
   PState extends PData,
   PAction extends PData,
-> extends Stem<
-  TiamatSvmUtxo<PConfig, PState, PAction>[],
-  MaybeSvmUtxo<PConfig, PState, PAction>
-> {
+  OutZT extends Zygote,
+> extends Stem<TiamatSvmUtxo<PConfig, PState, PAction>[], OutZT> {
   readonly __brand = `SvmStem`;
   constructor(
     svm: TiamatSvm<PConfig, PState, PAction>,
     sensing: (
       svmUtxos: TiamatSvmUtxo<PConfig, PState, PAction>[],
       trace: Trace,
-    ) => Promise<MaybeSvmUtxo<PConfig, PState, PAction>>,
+    ) => Promise<OutZT>,
     tolerance = 0,
   ) {
     const name = `${svm.name} SvmStem`;
