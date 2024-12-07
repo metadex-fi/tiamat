@@ -9,17 +9,19 @@ import { Token } from "../asset/token";
 import { PPositive } from "../bounded/positive";
 import { PValue, Value } from "./value";
 import { Rational } from "../rational";
+import { Wrapper } from "../../fundamental/type";
 
 /**
  *
  */
-export class PositiveValue {
+export class PositiveValue implements Wrapper<`value`, Value> {
   public readonly typus = "PositiveValue";
+  __wrapperBrand: `value` = `value`;
   /**
    *
    * @param value
    */
-  constructor(private value = new Value()) {
+  constructor(public value = new Value()) {
     assert(value.positive, `value must be positive: ${value.show()}`);
   }
 
@@ -413,7 +415,7 @@ export const boundPositive = Value.newBoundedWith(new PPositive());
 /**
  *
  */
-export class PPositiveValue extends PWrapped<PositiveValue> {
+export class PPositiveValue extends PWrapped<`value`, PValue, PositiveValue> {
   /**
    *
    */
@@ -425,7 +427,7 @@ export class PPositiveValue extends PWrapped<PositiveValue> {
   /**
    *
    */
-  static override genPType(): PPositiveValue {
+  static override genPType(): PWrapped<`value`, PValue, PositiveValue> {
     return PPositiveValue.ptype;
   }
 }

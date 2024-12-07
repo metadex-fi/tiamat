@@ -1,16 +1,17 @@
 import assert from "assert";
 import { Core } from "@blaze-cardano/sdk";
 import { PWrapped } from "../../fundamental/container/wrapped";
-import { PByteString } from "../../fundamental/primitive/bytestring";
-import { asCorePlutusData, Data } from "../../fundamental/type";
+import { asCorePlutusData, Data, Wrapper } from "../../fundamental/type";
 import { TraceUtxo } from "../../../../utils/wrappers";
+import { PString } from "../../fundamental/primitive/string";
 
 // product from hashing-function
 /**
  *
  */
-export class Hash {
+export class Hash implements Wrapper<`bytes`, Core.Hash32ByteBase16> {
   public readonly typus = "Hash";
+  __wrapperBrand: `bytes` = `bytes`;
   /**
    *
    * @param bytes
@@ -142,19 +143,19 @@ export class Hash {
 /**
  *
  */
-export class PHash extends PWrapped<Hash> {
+export class PHash extends PWrapped<`bytes`, PString, Hash> {
   /**
    *
    */
   private constructor() {
-    super(new PByteString(Hash.numHalfBytes, Hash.numHalfBytes), Hash, "Hash");
+    super(new PString(Hash.numHalfBytes, Hash.numHalfBytes), Hash, "Hash");
   }
 
   static ptype = new PHash();
   /**
    *
    */
-  static override genPType(): PWrapped<Hash> {
+  static override genPType(): PWrapped<`bytes`, PString, Hash> {
     return PHash.ptype;
   }
 }

@@ -194,7 +194,15 @@ export type MatrixActionType =
 /**
  *
  */
-export class PMatrixActionType extends PSum<MatrixActionType> {
+export class PMatrixActionType extends PSum<
+  [
+    RegisterVector,
+    DeregisterVector,
+    ChangeStake,
+    UpdateVector,
+    ChangeProtocolParams,
+  ]
+> {
   /**
    *
    */

@@ -12,6 +12,7 @@ import {
   PData,
   PLifted,
   PType,
+  PBlueprinted,
   RecordOfMaybe,
   t,
 } from "../type";
@@ -22,10 +23,10 @@ import { gMaxLength } from "../../../../utils/constants";
  */
 export class PRecord<PFields extends PData>
   implements
-    PType<ConstrData<PConstanted<PFields>>, RecordOfMaybe<PLifted<PFields>>>
+    PType<ConstrData<PConstanted<PFields>[]>, RecordOfMaybe<PLifted<PFields>>>
 {
   public readonly population: bigint | undefined;
-  private index = 0n; // for sum types
+  private index = 0; // for sum types
 
   /**
    *
@@ -52,14 +53,16 @@ export class PRecord<PFields extends PData>
    *
    * @param index
    */
-  public setIndex = (index: bigint) => (this.index = index);
+  public setIndex = (index: number) => {
+    this.index = index;
+  };
 
   /**
    *
    * @param c
    */
   public plift = (
-    c: ConstrData<PConstanted<PFields>>,
+    c: ConstrData<PConstanted<PFields>[]>,
   ): RecordOfMaybe<PLifted<PFields>> => {
     assert(
       c instanceof ConstrData,
@@ -67,7 +70,7 @@ export class PRecord<PFields extends PData>
     );
     assert(
       c.index === this.index,
-      `Record.plift: wrong index ${c.index} for ${this.showPType()}`,
+      `Record.plift: wrong index ${c.index.toString()} for ${this.showPType()}`,
     );
     const r: RecordOfMaybe<PLifted<PFields>> = {};
     let i = 0;
@@ -129,7 +132,7 @@ status: ${Object.keys(r).join(`,\n${f}`)}`,
    */
   public pconstant = (
     data: RecordOfMaybe<PLifted<PFields>>,
-  ): ConstrData<PConstanted<PFields>> => {
+  ): ConstrData<PConstanted<PFields>[]> => {
     this.checkFields(data);
 
     const l = new Array<PConstanted<PFields>>();
@@ -157,7 +160,7 @@ status: ${Object.keys(r).join(`,\n${f}`)}`,
    */
   public pblueprint = (
     data: RecordOfMaybe<PLifted<PFields>>,
-  ): Record<string, any> => {
+  ): Record<string, PBlueprinted<PFields>> => {
     this.checkFields(data);
 
     const bp = {} as {
@@ -170,9 +173,9 @@ status: ${Object.keys(r).join(`,\n${f}`)}`,
           value !== undefined,
           `cannot blueprint ${value} with pfield: ${pfield.showPType()}`,
         );
-        Object.assign(bp, {
-          [key]: pfield.pblueprint(value),
-        });
+        // Object.assign(bp, {
+        //   [key]: pfield.pblueprint(value),
+        // });
         bp[key] = pfield.pblueprint(value);
       } else {
         assert(

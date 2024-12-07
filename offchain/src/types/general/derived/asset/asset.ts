@@ -148,6 +148,11 @@ export class Asset {
   }
 }
 
+// export interface BPAsset {
+//   policy: string;
+//   name: string;
+// }
+
 /**
  *
  */
@@ -166,21 +171,21 @@ export class PAsset extends PObject<Asset> {
     );
   }
 
-  /**
-   *
-   * @param data
-   */
-  public override pblueprint = (
-    data: Asset,
-  ): {
-    policy: string;
-    name: string;
-  } => {
-    return {
-      policy: data.currency.toBlaze(),
-      name: data.token.toBlaze(),
-    };
-  };
+  // /**
+  //  *
+  //  * @param data
+  //  */
+  // public override pblueprint = (
+  //   data: Asset,
+  // ): {
+  //   policy: string;
+  //   name: string;
+  // } => {
+  //   return {
+  //     policy: data.currency.toBlaze(),
+  //     name: data.token.toBlaze(),
+  //   };
+  // };
 
   public override genData = Asset.generate;
 

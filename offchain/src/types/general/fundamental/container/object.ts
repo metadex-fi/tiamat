@@ -6,6 +6,7 @@ import {
   f,
   PBlueprint,
   PData,
+  PObjectBP,
   PType,
   t,
   TObject,
@@ -28,7 +29,11 @@ export const filterFunctionsAndTypus = <O extends object>(o: O) =>
 /**
  *
  */
-export class PObject<O extends TObject> implements PType<ConstrData<Data>, O> {
+export class PObject<
+  O extends TObject,
+  BPType extends PBlueprint = PObjectBP<O>,
+> implements PType<ConstrData<Data[]>, O, BPType>
+{
   public readonly population: bigint | undefined;
   /**
    *
@@ -51,13 +56,13 @@ export class PObject<O extends TObject> implements PType<ConstrData<Data>, O> {
    *
    * @param index
    */
-  public setIndex = (index: bigint) => this.precord.setIndex(index);
+  public setIndex = (index: number) => this.precord.setIndex(index);
 
   /**
    *
    * @param l
    */
-  public plift = (l: ConstrData<Data>): O => {
+  public plift = (l: ConstrData<Data[]>): O => {
     assert(l instanceof ConstrData, `plift: expected Constr`);
     const record = this.precord.plift(l);
     const args = Object.values(record);
@@ -68,7 +73,7 @@ export class PObject<O extends TObject> implements PType<ConstrData<Data>, O> {
    *
    * @param data
    */
-  public pconstant = (data: O): ConstrData<Data> => {
+  public pconstant = (data: O): ConstrData<Data[]> => {
     assert(
       data.typus === this.typus,
       `PObject.pconstant: expected typus ${this.typus}, got ${data.typus}`,
@@ -81,13 +86,13 @@ export class PObject<O extends TObject> implements PType<ConstrData<Data>, O> {
    *
    * @param data
    */
-  public pblueprint = (data: O): PBlueprint => {
+  public pblueprint = (data: O): BPType => {
     assert(
       data.typus === this.typus,
       `PObject.pblueprint: expected typus ${this.typus}, got ${data.typus}`,
     );
     const record = filterFunctionsAndTypus(data);
-    return this.precord.pblueprint(record);
+    return this.precord.pblueprint(record) as BPType;
   };
 
   /**
@@ -152,7 +157,7 @@ ${tt})`;
    * @param _gen
    * @param _maxDepth
    */
-  static genPType(_gen: Generators, _maxDepth: bigint): PObject<any> {
+  static genPType(_gen: Generators, _maxDepth: bigint): PObject<any, any> {
     const precord = new PRecord<PByteString | PInteger>({
       s: PByteString.genPType(),
       i: PInteger.genPType(),
@@ -169,7 +174,7 @@ ${tt})`;
 /**
  *
  */
-class ExampleClass {
+class ExampleClass implements TObject {
   public readonly typus = "ExampleClass";
   /**
    *

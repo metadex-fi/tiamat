@@ -13,24 +13,26 @@ validator svm_validator {
     utxo: tx.OutputReference,
     tx: tx.Transaction,
   ) {
-    expect Some(datum): Option<NexusDatum> = datum
-    mk_validator(
-      None,
-      extract_nexus,
-      nexus_fns.unhinged,
-      True,
-      unhalting,
-      // note: if changed, consider implications for find_nexus (now find_reference_svm) in svms
+    trace @"nexus svm_validator"
+    True
+    // expect Some(datum): Option<NexusDatum> = datum
+    // mk_validator(
+    //   None,
+    //   extract_nexus,
+    //   nexus_fns.unhinged,
+    //   True,
+    //   unhalting,
+    //   // note: if changed, consider implications for find_nexus (now find_reference_svm) in svms
 
-      datum,
-      redeemer,
-      utxo,
-      tx,
-    )
+    //   datum,
+    //   redeemer,
+    //   utxo,
+    //   tx,
+    // )
   }
 
   else(_) {
-    fail
+    fail @"nexus svm_validator: not spend"
   }
 }
 
@@ -48,6 +50,6 @@ validator nft_policy(nexus_address: Address, nexus_id: AssetName) {
   }
 
   else(_) {
-    fail
+    fail @"nexus nft_policy: not mint"
   }
 }

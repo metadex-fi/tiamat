@@ -180,7 +180,7 @@ export type Credential = VerificationKey | Script;
 /**
  *
  */
-export class PCredential extends PSum<Credential> {
+export class PCredential extends PSum<[VerificationKey, Script]> {
   /**
    *
    */
@@ -324,7 +324,7 @@ export type Referenced<Of> = Inline<Of> | Pointer;
  *
  */
 export class PReferenced<POf extends PData> extends PSum<
-  Referenced<PLifted<POf>>
+  [Inline<PLifted<POf>>, Pointer]
 > {
   /**
    *
@@ -484,10 +484,31 @@ export class Address {
   // };
 }
 
+export interface BPAddress {
+  paymentCredential: { VerificationKey: [string] } | { Script: [string] };
+  stakeCredential:
+    | {
+        Inline: [
+          | {
+              VerificationKey: [string];
+            }
+          | { Script: [string] },
+        ];
+      }
+    | {
+        Pointer: {
+          slotNumber: bigint;
+          transactionIndex: bigint;
+          certificateIndex: bigint;
+        };
+      }
+    | null;
+}
+
 /**
  *
  */
-export class PAddress extends PObject<Address> {
+export class PAddress extends PObject<Address, BPAddress> {
   /**
    *
    */

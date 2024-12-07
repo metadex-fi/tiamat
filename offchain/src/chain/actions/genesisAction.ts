@@ -110,7 +110,7 @@ export class GenesisAction<DC extends PDappConfigT, DP extends PDappParamsT> {
       [],
       Interval.inclusive(
         this.firstCycleFrom,
-        this.firstCycleFrom + initTiamatParams.cycle_duration,
+        this.firstCycleFrom + initTiamatParams.cycleDuration,
       ),
     );
 

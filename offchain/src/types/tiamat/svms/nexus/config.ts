@@ -12,11 +12,11 @@ export class NexusConfig<DappConfig> {
   /**
    *
    * @param matrix
-   * @param dapp_config
+   * @param dappConfig
    */
   constructor(
     public readonly matrix: Asset, //HashAsset,
-    public readonly dapp_config: DappConfig,
+    public readonly dappConfig: DappConfig,
   ) {}
 }
 
@@ -33,7 +33,7 @@ export class PNexusConfig<PDappConfig extends PData> extends PObject<
     super(
       new PRecord({
         matrix: PAsset.ptype, //PHashAsset.ptype,
-        dapp_config: pdappConfig,
+        dappConfig: pdappConfig,
       }),
       NexusConfig,
       `NexusConfig`,

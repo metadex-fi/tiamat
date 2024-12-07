@@ -17,7 +17,7 @@ export class False {
 /**
  *
  */
-class PFalse extends PObject<False> {
+class PFalse extends PObject<False, false> {
   /**
    *
    */
@@ -60,7 +60,7 @@ export class True {
 /**
  *
  */
-class PTrue extends PObject<True> {
+class PTrue extends PObject<True, true> {
   /**
    *
    */
@@ -94,7 +94,7 @@ export type Bool = False | True;
 /**
  *
  */
-export class PBool extends PSum<Bool> {
+export class PBool extends PSum<[False, True]> {
   /**
    *
    */

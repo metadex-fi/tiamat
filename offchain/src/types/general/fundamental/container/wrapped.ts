@@ -1,14 +1,29 @@
 import assert from "assert";
 import { Generators } from "../../../../utils/generators";
-import { Data, f, PBlueprint, PData, PType, t, TObject } from "../type";
-import { filterFunctionsAndTypus } from "./object";
+import {
+  f,
+  PConstanted,
+  PData,
+  PType,
+  PBlueprinted,
+  t,
+  TObject,
+  Wrapper,
+  PLifted,
+} from "../type";
+import { filterFunctionsAndTypus, PObject } from "./object";
 
 // like PObject, but only one field in the PRecord.
 // Purpose is removing the extra Arrays around pconstanted wrappers.
 /**
  *
  */
-export class PWrapped<O extends TObject> implements PType<Data, O> {
+export class PWrapped<
+  K extends string,
+  PInner extends PData,
+  O extends TObject & Wrapper<K, PLifted<PInner>>,
+> implements PType<PConstanted<PInner>, O, PBlueprinted<PInner>>
+{
   population: bigint | undefined;
 
   /**
@@ -17,7 +32,7 @@ export class PWrapped<O extends TObject> implements PType<Data, O> {
    * @param O
    */
   constructor(
-    public readonly pinner: PData,
+    public readonly pinner: PInner,
     public readonly O: new (arg: any) => O,
     public readonly typus: string,
   ) {
@@ -32,7 +47,8 @@ export class PWrapped<O extends TObject> implements PType<Data, O> {
    *
    * @param data
    */
-  public plift = (data: Data): O => {
+  public plift = (data: PConstanted<PInner>): O => {
+    // assert(data instanceof ConstrData, `plift: expected Constr`);
     const inner = this.pinner.plift(data);
     return new this.O(inner);
   };
@@ -41,7 +57,7 @@ export class PWrapped<O extends TObject> implements PType<Data, O> {
    *
    * @param data
    */
-  public pconstant = (data: O): Data => {
+  public pconstant = (data: O): PConstanted<PInner> => {
     assert(
       data.typus === this.typus,
       `pconstant: expected typus ${this.typus}, got ${data.typus}`,
@@ -49,14 +65,14 @@ export class PWrapped<O extends TObject> implements PType<Data, O> {
     const inner = filterFunctionsAndTypus(data);
     const values = Object.values(inner);
     assert(values.length === 1, `pconstant: expected one value`);
-    return this.pinner.pconstant(values[0]);
+    return this.pinner.pconstant(values[0]) as PConstanted<PInner>;
   };
 
   /**
    *
    * @param data
    */
-  public pblueprint = (data: O): PBlueprint => {
+  public pblueprint = (data: O): PBlueprinted<PInner> => {
     assert(
       data.typus === this.typus,
       `pblueprint: expected typus ${this.typus}, got ${data.typus}`,
@@ -64,7 +80,8 @@ export class PWrapped<O extends TObject> implements PType<Data, O> {
     const inner = filterFunctionsAndTypus(data);
     const values = Object.values(inner);
     assert(values.length === 1, `pblueprint: expected one value`);
-    return this.pinner.pblueprint(values[0]);
+    const value = values[0]!;
+    return this.pinner.pblueprint(value) as PBlueprinted<PInner>;
   };
 
   /**
@@ -130,8 +147,12 @@ ${tt})`;
    * @param gen
    * @param maxDepth
    */
-  static genPType(gen: Generators, maxDepth: bigint): PWrapped<any> {
-    const pinner = gen.generate(maxDepth);
+  static genPType(
+    gen: Generators,
+    maxDepth: bigint,
+  ): PWrapped<`inner`, PData, any> {
+    // const pinner = gen.generate(maxDepth);
+    const pinner = PObject.genPType(gen, maxDepth);
 
     return new PWrapped(pinner, WrapperClass, `WrapperClass`);
   }
@@ -140,8 +161,9 @@ ${tt})`;
 /**
  *
  */
-class WrapperClass {
+class WrapperClass implements TObject, Wrapper<`inner`, PConstanted<PData>> {
   public readonly typus = "WrapperClass";
+  __wrapperBrand: `inner` = `inner`;
   /**
    *
    * @param inner

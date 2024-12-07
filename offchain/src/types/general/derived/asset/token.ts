@@ -3,12 +3,14 @@ import { Core } from "@blaze-cardano/sdk";
 import { PWrapped } from "../../fundamental/container/wrapped";
 import { PByteString } from "../../fundamental/primitive/bytestring";
 import { TraceUtxo } from "../../../../utils/wrappers";
+import { Wrapper } from "../../fundamental/type";
 
 /**
  *
  */
-export class Token {
+export class Token implements Wrapper<`hexName`, Uint8Array> {
   public readonly typus = "Token";
+  __wrapperBrand: `hexName` = `hexName`;
   // TODO only temporarily private for refactor (name is now a hex)
   /**
    *
@@ -176,7 +178,7 @@ export class Token {
 /**
  *
  */
-export class PToken extends PWrapped<Token> {
+export class PToken extends PWrapped<`hexName`, PByteString, Token> {
   /**
    *
    */
@@ -188,7 +190,7 @@ export class PToken extends PWrapped<Token> {
   /**
    *
    */
-  static override genPType(): PWrapped<Token> {
+  static override genPType(): PWrapped<`hexName`, PByteString, Token> {
     return PToken.ptype;
   }
 }

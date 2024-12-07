@@ -109,7 +109,7 @@ export class ElectionPrecon<
 
         const supportVectorSets = computeSubsets(
           prior.eligibleEVs,
-          Number(prior.tiamatParams.num_support_vectors),
+          Number(prior.tiamatParams.numSupportVectors),
         );
         for (const supportVectorSet of supportVectorSets) {
           let fixingTx_ = fixingTx.clone(); // includes the election-tx

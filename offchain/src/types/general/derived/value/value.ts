@@ -2,7 +2,7 @@ import assert from "assert";
 import { abs, max, min } from "../../../../utils/generators";
 import { AssocMap, PMap } from "../../fundamental/container/map";
 import { PWrapped } from "../../fundamental/container/wrapped";
-import { f, t } from "../../fundamental/type";
+import { f, t, Wrapper } from "../../fundamental/type";
 import { Asset } from "../asset/asset";
 import { Assets, ccysTkns } from "../asset/assets";
 import { Currency, PCurrency } from "../asset/currency";
@@ -26,13 +26,16 @@ const showAmnt = (amnt: bigint): string =>
 /**
  *
  */
-export class Value {
+export class Value
+  implements Wrapper<`value`, AssocMap<Currency, AssocMap<Token, bigint>>>
+{
   public readonly typus = "Value";
+  __wrapperBrand: `value` = `value`;
   /**
    *
    * @param value
    */
-  constructor(private value = ccysTknsAmnts.anew) {
+  constructor(public value = ccysTknsAmnts.anew) {
     Value.assert(this);
   }
 
@@ -803,7 +806,11 @@ export class Value {
 /**
  *
  */
-export class PValue extends PWrapped<Value> {
+export class PValue extends PWrapped<
+  `value`,
+  PMap<PCurrency, PMap<PToken, PBounded>>,
+  Value
+> {
   /**
    *
    * @param pbounded
@@ -826,7 +833,11 @@ export class PValue extends PWrapped<Value> {
   /**
    *
    */
-  static override genPType(): PWrapped<Value> {
+  static override genPType(): PWrapped<
+    `value`,
+    PMap<PCurrency, PMap<PToken, PBounded>>,
+    Value
+  > {
     return new PValue(PBounded.genPType() as PBounded);
   }
 }

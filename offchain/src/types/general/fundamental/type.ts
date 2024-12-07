@@ -10,27 +10,25 @@ T is the equivalent concrete type.
 import { Core } from "@blaze-cardano/sdk";
 import { assert } from "console";
 
-/**
- *
- */
-export class ConstrData<T extends Data> {
+export class ConstrData<DataTs extends Data[]> {
   /**
    *
    * @param index
    * @param fields
    */
   constructor(
-    public index: bigint,
-    public fields: T[],
+    public index: keyof DataTs,
+    public fields: { [Index in keyof DataTs]: DataTs[Index] }, // Enforces alignment with DataTs
   ) {}
 }
 
+// export type DataSum = { [Index in keyof any[]]: Data };
 export type Data =
   | Uint8Array
   | bigint
-  | Data[]
+  | Array<Data>
   | Map<Data, Data>
-  | ConstrData<Data>;
+  | ConstrData<Data[]>;
 
 // export const Data_ = {
 //   to: (data: Data): Core.Datum | Core.Redeemer => {
@@ -107,101 +105,204 @@ export function asCorePlutusData(data: Data): Core.PlutusData {
     for (const elem of data.fields) {
       list.add(asCorePlutusData(elem));
     }
-    const constr = new Core.ConstrPlutusData(data.index, list);
+    const constr = new Core.ConstrPlutusData(
+      BigInt(data.index as number),
+      list,
+    );
     return Core.PlutusData.newConstrPlutusData(constr);
   } else {
     throw new Error(`asCorePlutusData: unknown data type ${data}`);
   }
 }
 
+// /**
+//  *
+//  * @param constr
+//  */
+// export function fromCorePlutusDatum<DataTs extends Data[]>(
+//   constr: Core.ConstrPlutusData,
+// ): ConstrData<DataTs> {
+//   const list: { [Index in keyof DataTs]: DataTs[Index] } = [];
+//   const fields = constr.getData();
+//   for (let i = 0; i < fields.getLength(); i++) {
+//     const aa = fields.get(i);
+//     const bb = fromCorePlutusData(aa);
+//     list.push(bb);
+//   }
+//   return new ConstrData<DataTs>(Number(constr.getAlternative()), list);
+// }
+
 /**
  *
  * @param constr
  */
-export function fromCorePlutusDatum(
-  constr: Core.ConstrPlutusData,
-): ConstrData<Data> {
-  const list: Data[] = [];
-  const fields = constr.getData();
-  for (let i = 0; i < fields.getLength(); i++) {
-    list.push(fromCorePlutusData(fields.get(i)));
+function fromCorePlutusTuple<DataTs extends Data[]>(
+  plutusList: Core.PlutusList,
+): { [Index in keyof DataTs]: DataTs[Index] } {
+  const dataList: Core.PlutusData[] = [];
+  for (let i = 0; i < plutusList.getLength(); i++) {
+    dataList.push(plutusList.get(i));
   }
-  return new ConstrData(constr.getAlternative(), list);
+
+  const list = dataList.map((x, i) =>
+    fromCorePlutusData<DataTs[typeof i]>(x),
+  ) as { [Index in keyof DataTs]: DataTs[Index] };
+
+  return list;
+}
+
+export function fromCorePlutusConstr<DataTs extends Data[]>(
+  data: Core.PlutusData,
+): ConstrData<DataTs> {
+  const constr = data.asConstrPlutusData();
+  if (!constr) {
+    throw new Error(
+      `fromCorePlutusConstr: expected Constr, got ${data} (${data.toCbor()})`,
+    );
+  }
+
+  const fields = constr.getData();
+  const list = fromCorePlutusTuple<DataTs>(fields);
+
+  return new ConstrData<DataTs>(Number(constr.getAlternative()), list);
+}
+
+/**
+ *
+ * @param constr
+ */
+export function fromCorePlutusMap<KeyDT extends Data, ValueDT extends Data>(
+  data: Core.PlutusData,
+): Map<KeyDT, ValueDT> {
+  const map = data.asMap();
+  if (!map) {
+    throw new Error(
+      `fromCorePlutusMap: expected Map, got ${data} (${data.toCbor()}`,
+    );
+  }
+  const mapData = new Map<KeyDT, ValueDT>();
+  const keys = map.getKeys();
+  for (let i = 0; i < map.getLength(); i++) {
+    const key_ = keys.get(i);
+    const key = fromCorePlutusData<KeyDT>(key_);
+    const value_ = map.get(key_);
+    assert(
+      value_,
+      `fromCorePlutusMap: expected value, got ${value_} (${data.toCbor()}`,
+    );
+    const value = fromCorePlutusData<ValueDT>(value_!);
+    mapData.set(key, value);
+  }
+  return mapData;
+}
+
+/**
+ *
+ * @param constr
+ */
+export function fromCorePlutusList<ElemT extends Data>(
+  data: Core.PlutusData,
+): Array<ElemT> {
+  const plutusList = data.asList();
+  if (!plutusList) {
+    throw new Error(
+      `fromCorePlutusList: expected List, got ${data} (${data.toCbor()}`,
+    );
+  }
+  const list: ElemT[] = [];
+  for (let i = 0; i < plutusList.getLength(); i++) {
+    const elem = plutusList.get(i);
+    list.push(fromCorePlutusData<ElemT>(elem));
+  }
+  return list;
+}
+
+/**
+ *
+ * @param constr
+ */
+export function fromCorePlutusInteger(data: Core.PlutusData): bigint {
+  const integer = data.asInteger();
+  if (!integer) {
+    throw new Error(
+      `fromCorePlutusInteger: expected Bytes, got ${data} (${data.toCbor()}`,
+    );
+  }
+  return integer;
+}
+
+/**
+ *
+ * @param constr
+ */
+export function fromCorePlutusBytes(data: Core.PlutusData): Uint8Array {
+  const bytes = data.asBoundedBytes();
+  if (!bytes) {
+    throw new Error(
+      `fromCorePlutusBytes: expected Bytes, got ${data} (${data.toCbor()}`,
+    );
+  }
+  return bytes;
+}
+
+function isConstrData<T>(): T extends ConstrData<Data[]> ? true : false {
+  return true as any;
+}
+
+function isMapData<T>(): T extends Map<Data, Data> ? true : false {
+  return true as any;
+}
+
+function isListData<T>(): T extends Data[] ? true : false {
+  return true as any;
+}
+
+function isBigIntData<T>(): T extends bigint ? true : false {
+  return true as any;
+}
+
+function isUint8ArrayData<T>(): T extends Uint8Array ? true : false {
+  return true as any;
 }
 
 /**
  *
  * @param data
  */
-export function fromCorePlutusData(data: Core.PlutusData): Data {
+export function fromCorePlutusData<DataT extends Data>(
+  data: Core.PlutusData,
+): DataT {
   const kind = data.getKind();
   switch (kind) {
     case Core.PlutusDataKind.ConstrPlutusData:
-      const constr = data.asConstrPlutusData();
-      if (!constr) {
-        throw new Error(
-          `fromCorePlutusData: expected ConstrPlutusData, got ${data} (${data.toCbor()}`,
-        );
+      if (!isConstrData<DataT>()) {
+        throw new Error(`DataT must be ConstrData when kind is Constr`);
       }
-      const list: Data[] = [];
-      const fields = constr.getData();
-      for (let i = 0; i < fields.getLength(); i++) {
-        list.push(fromCorePlutusData(fields.get(i)));
-      }
-      return new ConstrData(constr.getAlternative(), list);
+      return fromCorePlutusConstr(data) as DataT;
 
     case Core.PlutusDataKind.Map:
-      const map = data.asMap();
-      if (!map) {
-        throw new Error(
-          `fromCorePlutusData: expected Map, got ${data} (${data.toCbor()}`,
-        );
+      if (!isMapData<DataT>()) {
+        throw new Error(`DataT must be Map when kind is Map`);
       }
-      const mapData = new Map();
-      const keys = map.getKeys();
-      for (let i = 0; i < map.getLength(); i++) {
-        const key_ = keys.get(i);
-        const key = fromCorePlutusData(key_);
-        const value_ = map.get(key_);
-        assert(
-          value_,
-          `fromCorePlutusData: expected value, got ${value_} (${data.toCbor()}`,
-        );
-        const value = fromCorePlutusData(value_!);
-        mapData.set(key, value);
-      }
-      return mapData;
+      return fromCorePlutusMap(data) as DataT;
 
     case Core.PlutusDataKind.List:
-      const list_ = data.asList();
-      if (!list_) {
-        throw new Error(
-          `fromCorePlutusData: expected List, got ${data} (${data.toCbor()}`,
-        );
+      if (!isListData<DataT>()) {
+        throw new Error(`DataT must be Array when kind is List`);
       }
-      const listData = [];
-      for (let i = 0; i < list_.getLength(); i++) {
-        listData.push(fromCorePlutusData(list_.get(i)));
-      }
-      return listData;
+      return fromCorePlutusList(data) as DataT;
 
     case Core.PlutusDataKind.Integer:
-      const integer = data.asInteger();
-      if (integer === undefined) {
-        throw new Error(
-          `fromCorePlutusData: expected Integer, got ${data} (${data.toCbor()})`,
-        );
+      if (!isBigIntData<DataT>()) {
+        throw new Error(`DataT must be bigint when kind is Integer`);
       }
-      return integer;
+      return fromCorePlutusInteger(data) as DataT;
 
     case Core.PlutusDataKind.Bytes:
-      const bytes = data.asBoundedBytes();
-      if (!bytes) {
-        throw new Error(
-          `fromCorePlutusData: expected Bytes, got ${data} (${data.toCbor()}`,
-        );
+      if (!isUint8ArrayData<DataT>()) {
+        throw new Error(`DataT must be Uint8Array when kind is Bytes`);
       }
-      return bytes;
+      return fromCorePlutusBytes(data) as DataT;
 
     default:
       throw new Error(`fromCorePlutusData: unknown kind ${kind}`);
@@ -252,37 +353,131 @@ export function fromCorePlutusData(data: Core.PlutusData): Data {
 // },
 // };
 
-export type RecordOfMaybe<T> = Record<string, T | undefined>;
+// export function checkBlueprint(target: PBlueprint, actual: PBlueprint): string {
+//   if (typeof target === "bigint") {
+//     if (target === actual) {
+//       return "ok";
+//     } else {
+//       return `expected ${typeof target}, got ${typeof actual}`;
+//     }
+//   } else if (typeof target === "string") {
+//     if
+//   } else if (typeof target === "boolean") {
+//     return target === actual;
+//   } else if (target === null) {
+//     return actual === null;
+//   } else if (target === undefined) {
+//     return actual === undefined;
+//   } else if (target instanceof Array) {
+//     if (!(actual instanceof Array)) {
+//       return false;
+//     }
+//     if (target.length !== actual.length) {
+//       return false;
+//     }
+//     for (let i = 0; i < target.length; i++) {
+//       if (!checkBlueprint(target[i], actual[i])) {
+//         return false;
+//       }
+//     }
+//     return true;
+//   } else if (target instanceof Map) {
+//     if (!(actual instanceof Map)) {
+//       return false;
+//     }
+//     if (target.size !== actual.size) {
+//       return false;
+//     }
+//     for (const [k, v] of target.entries()) {
+//       if (!checkBlueprint(v, actual.get(k))) {
+//         return false;
+//       }
+//     }
+//     return true;
+//   } else {
+//     return false;
+//   }
 
-export interface TObject {
-  typus: string;
-}
+// }
+
+export type RecordOfMaybe<T> = Record<string, T | undefined>;
 
 // we need two types here, because we can both map multiple Data-types onto the same
 // Lifted-type, and vice versa; examples (Data -> LIfted):
 // 1. Array maps to Array (via PList), Record (via PRecord) and Object (via PObject)
 // 2. Array (via PObject) and Constr (via PSum) map to Object
-export interface PType<D extends Data, L> {
+export interface PType<
+  D extends Data,
+  L,
+  BPType extends PBlueprint = DataBP<D>,
+> {
   readonly population: bigint | undefined; // undefined means infinite TODO better way?
   plift(data: D): L;
   pconstant(data: L): D;
-  pblueprint(data: L): PBlueprint;
+  pblueprint(data: L): BPType;
   genData(): L;
   showData(data: L, tabs?: string, maxDepth?: bigint): string;
   showPType(tabs?: string, maxDepth?: bigint): string;
 }
 
-export type PData = PType<Data, unknown>;
+export type PData = PType<Data, unknown, PBlueprint>;
 export type PLifted<P extends PData> = ReturnType<P["plift"]>;
 export type PConstanted<P extends PData> = ReturnType<P["pconstant"]>;
+export type PBlueprinted<P extends PData> = ReturnType<P["pblueprint"]>;
 // export type PBlueprinted<P extends PData> = ReturnType<P['pblueprint']>;
-export type PBlueprint =
-  | Record<string, any>
+export type PBlueprint = Record<string, any> | PBlueprintSimple;
+
+type PBlueprintSimple =
+  | Array<PBlueprint>
+  | Map<PBlueprint, PBlueprint>
   | bigint
   | string
   | boolean
   | null
   | undefined;
+
+export type DataBP<DataT extends Data> = DataT extends Uint8Array
+  ? string
+  : DataT extends bigint
+    ? bigint
+    : DataT extends Array<infer E extends Data>
+      ? Array<DataBP<E>>
+      : DataT extends Map<infer K extends Data, infer V extends Data>
+        ? Map<DataBP<K>, DataBP<V>>
+        : DataT extends ConstrData<infer D extends Data[]>
+          ? // ? Record<string, DataBP<D[number]>> TODO FIXME
+            Record<string, any>
+          : never;
+
+export interface TObject extends Object {
+  typus: string;
+}
+
+export type Wrapper<K extends string, InnerT> = { [P in K]: InnerT } & {
+  __wrapperBrand: K;
+};
+
+export type PObjectBP<O extends TObject> =
+  O extends Wrapper<infer K, infer V>
+    ? PFieldBP<PWrapperPB<O[`__wrapperBrand`], O>>
+    : {
+        [K in keyof O]: PFieldBP<O[K]>;
+      };
+
+type PWrapperPB<K extends string, W extends Wrapper<any, any>> = W[K];
+type PFieldBP<T> = T extends TObject
+  ? PObjectBP<T> // Recurse if the field is TObject
+  : T extends Uint8Array
+    ? string
+    : T extends bigint
+      ? bigint
+      : T extends Array<infer E>
+        ? Array<PFieldBP<E>>
+        : T extends Map<infer K, infer V>
+          ? Map<PFieldBP<K>, PFieldBP<V>>
+          : T;
+
+// export type PTypeBP<P extends PData> = DataBP<PConstanted<P>>;
 
 export const f = "+  ";
 export const t = "   ";

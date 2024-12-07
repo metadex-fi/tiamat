@@ -1,12 +1,20 @@
 import assert from "assert";
 import { Generators } from "../../../../utils/generators";
-import { f, PBlueprint, PConstanted, PData, PLifted, PType, t } from "../type";
+import {
+  f,
+  PConstanted,
+  PData,
+  PLifted,
+  PType,
+  PBlueprinted,
+  t,
+} from "../type";
 
 /**
  *
  */
 export class PConstraint<PInner extends PData>
-  implements PType<PConstanted<PInner>, PLifted<PInner>>
+  implements PType<PConstanted<PInner>, PLifted<PInner>, PBlueprinted<PInner>>
 {
   public population: bigint | undefined;
 
@@ -65,7 +73,7 @@ export class PConstraint<PInner extends PData>
    *
    * @param data
    */
-  public pblueprint = (data: PLifted<PInner>): PBlueprint => {
+  public pblueprint = (data: PLifted<PInner>): PBlueprinted<PInner> => {
     this.asserts.forEach((assertion) => {
       try {
         assertion(data);
@@ -77,7 +85,7 @@ export class PConstraint<PInner extends PData>
         );
       }
     });
-    return this.pinner.pblueprint(data);
+    return this.pinner.pblueprint(data) as PBlueprinted<PInner>;
   };
 
   /**

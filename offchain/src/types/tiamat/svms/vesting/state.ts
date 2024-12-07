@@ -9,10 +9,10 @@ export class VestingState {
   public readonly typus = "VestingState";
   /**
    *
-   * @param time_lock
+   * @param timeLock
    */
   constructor(
-    public readonly time_lock: bigint, // NOTE: onchain is after all in ms
+    public readonly timeLock: bigint, // NOTE: onchain is after all in ms
   ) {}
 }
 
@@ -26,7 +26,7 @@ export class PVestingState extends PObject<VestingState> {
   constructor() {
     super(
       new PRecord({
-        time_lock: PInteger.ptype,
+        timeLock: PInteger.ptype,
       }),
       VestingState,
       `VestingState`,

@@ -13,7 +13,7 @@ validator svm_validator {
   }
 
   else(_) {
-    fail
+    fail @"slut svm_validator: not spend"
   }
 }
 
@@ -23,6 +23,6 @@ validator nft_policy(_slut_address: Address) {
   }
 
   else(_) {
-    fail
+    fail @"slut nft_policy: not mint"
   }
 }

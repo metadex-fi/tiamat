@@ -461,7 +461,10 @@ export class Assets {
 /**
  *
  */
-export class PAssets extends PWrapped<Assets> {
+export class PAssets extends PWrapped<
+  PMap<PCurrency, PNonEmptyList<PToken>>,
+  Assets
+> {
   /**
    *
    */
@@ -475,7 +478,10 @@ export class PAssets extends PWrapped<Assets> {
   /**
    *
    */
-  static override genPType(): PWrapped<Assets> {
+  static override genPType(): PWrapped<
+    PMap<PCurrency, PNonEmptyList<PToken>>,
+    Assets
+  > {
     return PAssets.ptype;
   }
 }

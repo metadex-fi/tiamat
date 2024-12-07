@@ -142,7 +142,7 @@ export class SocketClient implements ChainInterface {
     election: ElectionData<DC, DP>,
     trace: Trace,
   ): Promise<Result> => {
-    this.numSupportVectors = election.tiamatParams.num_support_vectors;
+    this.numSupportVectors = election.tiamatParams.numSupportVectors;
     this.vectorData = election.eligibleEVsValencies;
     const newVectorIpPorts = [...this.vectorData.keys()];
     this.updateVectorConnections(newVectorIpPorts);

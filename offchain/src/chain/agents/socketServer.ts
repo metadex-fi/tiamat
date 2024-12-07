@@ -856,7 +856,7 @@ export class SocketServer<
     trace: Trace,
   ): Promise<Result> => {
     const trace_ = trace.via(`${this.name}.updateElectionConnections`);
-    this.tip = election.tiamatParams.suggested_tip;
+    this.tip = election.tiamatParams.suggestedTip;
     const firstOwnIndex = election.eligibleEVs.findIndex(
       (ev) => ev.vector.toBlaze() === this.ownPublicKeyHash,
     );
@@ -882,7 +882,7 @@ export class SocketServer<
       );
     }
 
-    const marginDurationMs = Number(election.tiamatParams.margin_duration);
+    const marginDurationMs = Number(election.tiamatParams.marginDuration);
 
     const counterConnectTimeoutMs = marginDurationMs * 2;
     const retryTimeoutMs = marginDurationMs;
@@ -2017,7 +2017,7 @@ export class SocketServer<
     this.log(`syncEigenValue`);
     assert(matrix.svmDatum, `${this.name}: no svmDatum in matrix utxo`);
     const trace_ = trace.via(`${this.name}.syncEigenValue`);
-    const eigenValues = matrix.svmDatum.state.eigen_values;
+    const eigenValues = matrix.svmDatum.state.eigenValues;
     const eigenwert = matrix.svmDatum.config.eigenwert;
     let firstTx: TxCompleat<`owner`> | undefined;
     let tx: Tx<`owner`> | undefined;

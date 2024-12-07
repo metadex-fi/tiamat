@@ -16,6 +16,7 @@ validator svm_validator(nexus: Asset) {
     utxo: tx.OutputReference,
     tx: tx.Transaction,
   ) {
+    trace @"vesting svm_validator"
     expect Some(datum): Option<VestingDatum> = datum
     mk_validator(
       Some(nexus),
@@ -31,7 +32,7 @@ validator svm_validator(nexus: Asset) {
   }
 
   else(_) {
-    fail
+    fail @"vesting svm_validator: not spend"
   }
 }
 
@@ -54,6 +55,6 @@ validator nft_policy(vestings_address: Address) {
   }
 
   else(_) {
-    fail
+    fail @"vesting nft_policy: not mint"
   }
 }

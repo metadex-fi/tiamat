@@ -5,7 +5,16 @@ import {
   genPositive,
   randomChoice,
 } from "../../../../utils/generators";
-import { ConstrData, Data, f, PBlueprint, PType, t, TObject } from "../type";
+import {
+  ConstrData,
+  Data,
+  f,
+  PData,
+  PType,
+  PBlueprinted,
+  t,
+  TObject,
+} from "../type";
 import { PObject } from "./object";
 import { PRecord } from "./record";
 import { PInteger } from "../primitive/integer";
@@ -14,14 +23,18 @@ import { PByteString } from "../primitive/bytestring";
 /**
  *
  */
-export class PSum<Os extends TObject> implements PType<ConstrData<Data>, Os> {
+export class PSum<Os extends TObject[]>
+  implements PType<ConstrData<Data[]>, Os[number]>
+{
   public readonly population: bigint | undefined;
   /**
    *
    * @param pconstrs
    */
   constructor(
-    public readonly pconstrs: Array<Os extends object ? PObject<Os> : never>,
+    public readonly pconstrs: {
+      [I in keyof Os]: Os[I] extends TObject ? PObject<Os[I], any> : never;
+    },
   ) {
     assert(pconstrs.length > 0, `PSum: expected at least one PObject`);
     assert(
@@ -36,7 +49,7 @@ export class PSum<Os extends TObject> implements PType<ConstrData<Data>, Os> {
       0n,
     );
     pconstrs.forEach((pconstr, i) => {
-      pconstr.setIndex(BigInt(i));
+      pconstr.setIndex(i);
     });
   }
 
@@ -44,28 +57,30 @@ export class PSum<Os extends TObject> implements PType<ConstrData<Data>, Os> {
    *
    * @param c
    */
-  public plift = (c: ConstrData<Data>): Os => {
+  public plift = <I extends number>(c: ConstrData<Data[]>): Os[I] => {
     // return {} as Os;
     assert(c instanceof ConstrData, `plift: expected Constr`);
+    assert(typeof c.index === `number`, `plift: Constr index not a number`);
     assert(
       c.index < this.pconstrs.length,
       `plift: constr index out of bounds: 
     ${c.index} >= ${this.pconstrs.length}
     for ${this.showPType()}`,
     );
-    return this.pconstrs[Number(c.index)]!.plift(c) as Os;
+    const pconstr: PObject<Os[typeof c.index]> = this.pconstrs[c.index]!;
+    return pconstr.plift(c);
   };
 
   /**
    *
    * @param data
    */
-  private matchData = (data: Os): PObject<Os> => {
+  private matchData = <I extends number>(data: Os[I]): PObject<Os[I]> => {
     assert(
       data instanceof Object,
       `PSum.matchData: expected Object, got ${data.toString()}`,
     );
-    const matches = new Array<PObject<Os>>();
+    const matches = new Array<PObject<Os[I]>>();
     this.pconstrs.forEach((pconstr) => {
       if (data instanceof pconstr.O) {
         matches.push(pconstr);
@@ -88,7 +103,7 @@ export class PSum<Os extends TObject> implements PType<ConstrData<Data>, Os> {
    *
    * @param data
    */
-  public pconstant = (data: Os): ConstrData<Data> => {
+  public pconstant = <I extends number>(data: Os[I]): ConstrData<Data[]> => {
     return this.matchData(data).pconstant(data);
   };
 
@@ -96,15 +111,27 @@ export class PSum<Os extends TObject> implements PType<ConstrData<Data>, Os> {
    *
    * @param data
    */
-  public pblueprint = (data: Os): PBlueprint => {
-    return this.matchData(data).pblueprint(data);
+  // public pblueprint = (data: Os[I]): PBlueprinted => {
+  public pblueprint = <I extends number>(
+    data: Os[I],
+  ): Record<Os[I][`typus`], PBlueprinted<PObject<Os[I]>>> => {
+    const match = this.matchData(data);
+
+    const matchBP = match.pblueprint(data);
+
+    const bp = {} as {
+      [key: string]: any;
+    };
+    bp[match.typus] = matchBP;
+
+    return bp as Record<Os[I][`typus`], PBlueprinted<PObject<Os[I]>>>;
   };
 
   /**
    *
    */
-  public genData = (): Os => {
-    return randomChoice(this.pconstrs).genData() as Os;
+  public genData = (): Os[number] => {
+    return randomChoice(this.pconstrs).genData();
   };
 
   /**
@@ -113,7 +140,11 @@ export class PSum<Os extends TObject> implements PType<ConstrData<Data>, Os> {
    * @param tabs
    * @param maxDepth
    */
-  public showData = (data: Os, tabs = "", maxDepth?: bigint): string => {
+  public showData = <I extends number>(
+    data: Os[I],
+    tabs = "",
+    maxDepth?: bigint,
+  ): string => {
     if (maxDepth !== undefined && maxDepth <= 0n) return "Sum ( … )";
     const tt = tabs + t;
     const ttf = tt + f;
@@ -192,7 +223,7 @@ ${tt})`;
     const len = genPositive(BigInt(pconstrs.length));
     const pconstrs_ = boundedSubset(pconstrs, len);
 
-    return new PSum<Constr0 | Constr1 | Constr2 | Constr3>(pconstrs_);
+    return new PSum<any[]>(pconstrs_);
   }
 }
 

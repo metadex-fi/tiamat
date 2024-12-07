@@ -20,7 +20,7 @@ export class NegativeInfinity {
 /**
  *
  */
-class PNegativeInfinity extends PObject<NegativeInfinity> {
+class PNegativeInfinity extends PObject<NegativeInfinity, string> {
   /**
    *
    */
@@ -119,7 +119,7 @@ export class PositiveInfinity {
 /**
  *
  */
-class PPositiveInfinity extends PObject<PositiveInfinity> {
+class PPositiveInfinity extends PObject<PositiveInfinity, string> {
   /**
    *
    */
@@ -157,7 +157,7 @@ export type IntervalBoundType<Of> =
  *
  */
 export class PIntervalBoundType<POf extends PData> extends PSum<
-  IntervalBoundType<PLifted<POf>>
+  [NegativeInfinity, Finite<PLifted<POf>>, PositiveInfinity]
 > {
   /**
    *

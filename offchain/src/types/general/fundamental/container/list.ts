@@ -4,14 +4,22 @@ import {
   genNonNegative,
   maybeNdef,
 } from "../../../../utils/generators";
-import { f, PBlueprint, PConstanted, PData, PLifted, PType, t } from "../type";
+import {
+  f,
+  PConstanted,
+  PData,
+  PLifted,
+  PType,
+  t,
+  PBlueprinted,
+} from "../type";
 import { gMaxLength } from "../../../../utils/constants";
 
 /**
  *
  */
 export class PList<PElem extends PData>
-  implements PType<PConstanted<PElem>[], PLifted<PElem>[]>
+  implements PType<Array<PConstanted<PElem>>, Array<PLifted<PElem>>>
 {
   public readonly population: bigint | undefined;
 
@@ -42,7 +50,7 @@ export class PList<PElem extends PData>
    *
    * @param l
    */
-  public plift = (l: PConstanted<PElem>[]): PLifted<PElem>[] => {
+  public plift = (l: Array<PConstanted<PElem>>): Array<PLifted<PElem>> => {
     assert(l instanceof Array, `List.plift: expected List: ${l}`);
     assert(
       !this.length || this.length === BigInt(l.length),
@@ -56,7 +64,9 @@ export class PList<PElem extends PData>
    *
    * @param data
    */
-  public pconstant = (data: PLifted<PElem>[]): PConstanted<PElem>[] => {
+  public pconstant = (
+    data: Array<PLifted<PElem>>,
+  ): Array<PConstanted<PElem>> => {
     assert(data instanceof Array, `pconstant: expected Array`);
     assert(
       !this.length || this.length === BigInt(data.length),
@@ -69,13 +79,18 @@ export class PList<PElem extends PData>
    *
    * @param data
    */
-  public pblueprint = (data: PLifted<PElem>[]): PBlueprint[] => {
+  public pblueprint = (
+    data: Array<PLifted<PElem>>,
+  ): Array<PBlueprinted<PElem>> => {
     assert(data instanceof Array, `pblueprint: expected Array`);
     assert(
       !this.length || this.length === BigInt(data.length),
       `pblueprint: wrong length`,
     );
-    return data.map(this.pelem.pblueprint);
+    const bpElem = this.pelem.pblueprint as (
+      d: PLifted<PElem>,
+    ) => PBlueprinted<PElem>;
+    return data.map(bpElem);
   };
 
   /**
@@ -94,9 +109,10 @@ export class PList<PElem extends PData>
   /**
    *
    */
-  public genData = (): PLifted<PElem>[] => {
+  public genData = (): Array<PLifted<PElem>> => {
     const length = this.length ? this.length : genNonNegative(gMaxLength);
-    return PList.genList(this.pelem.genData, length) as PLifted<PElem>[];
+    const genElem = this.pelem.genData as () => PLifted<PElem>;
+    return PList.genList<PLifted<PElem>>(genElem, length);
   };
 
   /**
@@ -106,7 +122,7 @@ export class PList<PElem extends PData>
    * @param maxDepth
    */
   public showData = (
-    data: PLifted<PElem>[],
+    data: Array<PLifted<PElem>>,
     tabs = "",
     maxDepth?: bigint,
   ): string => {

@@ -36,7 +36,7 @@ export class DeregisterVectorAction
       `DeregisterVectorAction: no svmDatum in matrixUtxo`,
     );
 
-    const index = matrixUtxo.svmDatum.state.eigen_values.findIndex(
+    const index = matrixUtxo.svmDatum.state.eigenValues.findIndex(
       (ev) => ev.vector.keyHash === this.vector.keyHash,
     );
     assert(
@@ -51,10 +51,10 @@ export class DeregisterVectorAction
 
     this.action = new MatrixAction(this.vector, new DeregisterVector());
 
-    const eigenValue = oldState.eigen_values[index]!;
+    const eigenValue = oldState.eigenValues[index]!;
     const stakedAmount = eigenValue.end - eigenValue.start;
 
-    const pre = oldState.eigen_values
+    const pre = oldState.eigenValues
       .slice(0, index)
       .map(
         (ev) =>
@@ -66,7 +66,7 @@ export class DeregisterVectorAction
             ev.port,
           ),
       );
-    const post = oldState.eigen_values.slice(index + 1);
+    const post = oldState.eigenValues.slice(index + 1);
 
     this.newState = new MatrixState(oldState.params, [...pre, ...post]);
 

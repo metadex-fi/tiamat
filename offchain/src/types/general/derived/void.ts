@@ -16,13 +16,13 @@ export class Void {
 /**
  *
  */
-export class PVoid extends PObject<Void> {
+export class PVoid extends PObject<Void, undefined> {
   /**
    *
    */
   constructor() {
     super(new PRecord({}), Void, `Void`);
-    this.setIndex(121n); // Void := d87980 decodes to "tag(121): array(0)" aka "Constr 121 []"
+    this.setIndex(121); // Void := d87980 decodes to "tag(121): array(0)" aka "Constr 121 []"
   }
 
   /**

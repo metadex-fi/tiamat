@@ -192,7 +192,7 @@ export type SvmRedeemer<Action> =
  *
  */
 export class PSvmRedeemer<PAction extends PData> extends PSum<
-  SvmRedeemer<PLifted<PAction>>
+  [Revolve<PLifted<PAction>>, Halt<PLifted<PAction>>, Wipe, Start]
 > {
   /**
    *

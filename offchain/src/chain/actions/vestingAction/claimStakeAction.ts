@@ -42,7 +42,7 @@ export class ClaimStakeAction
     const oldValue = vestingUtxo.svmValue;
     const oldState = vestingUtxo.svmDatum?.state;
     assert(oldState, `ClaimStakeAction: no state in vestingUtxo`);
-    const oldTimeLock = oldState.time_lock;
+    const oldTimeLock = oldState.timeLock;
 
     this.validFromMs = BigInt(Date.now());
 

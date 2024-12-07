@@ -30,10 +30,10 @@ pub fn start(
   expect Some(nexus_utxo) = nexus_utxo
   let nexus_datum: NexusDatum = extract_nexus(nexus_utxo.output)
   let nexus_config = nexus_datum.config
-  let matrix_policy = nexus_config.matrix.policy
-  let matrix_id = nexus_config.matrix.name
+  let matrix_policy = nexus_config.matrix.currency
+  let matrix_id = nexus_config.matrix.token
 
-  matrix_policy == this_policy && matrix_policy == id.policy && matrix_id == id.name
+  matrix_policy == this_policy && matrix_policy == id.currency && matrix_id == id.token
 }
 
 // update stake
@@ -70,8 +70,8 @@ pub fn unhinged(
     let params = old_state.params
     let e = config.eigenwert
     let deposited_e =
-      ( new_value |> assets.quantity_of(e.policy, e.name) ) - (
-        old_value |> assets.quantity_of(e.policy, e.name)
+      ( new_value |> assets.quantity_of(e.currency, e.token) ) - (
+        old_value |> assets.quantity_of(e.currency, e.token)
       )
 
     if deposited_e < 0 {
@@ -81,8 +81,8 @@ pub fn unhinged(
         fn(output) {
           has_some_of(output.value, params.vesting_policy) && assets.quantity_of(
             output.value,
-            e.policy,
-            e.name,
+            e.currency,
+            e.token,
           ) == -deposited_e
         },
       )

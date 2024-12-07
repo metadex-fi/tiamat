@@ -3,7 +3,7 @@ import { Generators } from "../../../utils/generators";
 import { PObject } from "../fundamental/container/object";
 import { PRecord } from "../fundamental/container/record";
 import { PSum } from "../fundamental/container/sum";
-import { f, PBlueprint, PData, PLifted } from "../fundamental/type";
+import { f, PData, PLifted } from "../fundamental/type";
 
 /**
  *
@@ -125,7 +125,9 @@ export type Option<Of> = Some<Of> | None;
 /**
  *
  */
-export class POption<POf extends PData> extends PSum<Option<PLifted<POf>>> {
+export class POption<POf extends PData> extends PSum<
+  [Some<PLifted<POf>>, None]
+> {
   /**
    *
    * @param pof

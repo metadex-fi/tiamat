@@ -8,17 +8,19 @@ import { Currency } from "../asset/currency";
 import { Token } from "../asset/token";
 import { PValue, Value } from "./value";
 import { PNonneg } from "../bounded/nonneg";
+import { Wrapper } from "../../fundamental/type";
 
 /**
  *
  */
-export class NonnegValue {
+export class NonnegValue implements Wrapper<`value`, Value> {
   public readonly typus = "NonnegValue";
+  __wrapperBrand: `value` = `value`;
   /**
    *
    * @param value
    */
-  constructor(private value = new Value()) {
+  constructor(public value = new Value()) {
     assert(value.nonnegative, `value must be nonnegative: ${value.show()}`);
   }
 
@@ -393,7 +395,7 @@ export const boundNonneg = Value.newBoundedWith(new PNonneg());
 /**
  *
  */
-export class PNonnegValue extends PWrapped<NonnegValue> {
+export class PNonnegValue extends PWrapped<`value`, PValue, NonnegValue> {
   /**
    *
    */
@@ -405,7 +407,7 @@ export class PNonnegValue extends PWrapped<NonnegValue> {
   /**
    *
    */
-  static override genPType(): PNonnegValue {
+  static override genPType(): PWrapped<`value`, PValue, NonnegValue> {
     return PNonnegValue.ptype;
   }
 }

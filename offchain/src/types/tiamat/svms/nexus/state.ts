@@ -19,19 +19,19 @@ export class NexusState<DP extends PDappParamsT> {
   public readonly typus = "NexusState";
   /**
    *
-   * @param tiamat_params
-   * @param dapp_params
+   * @param tiamatParams
+   * @param dappParams
    * @param eigenvectors
-   * @param current_cycle
+   * @param currentCycle
    */
   constructor(
-    public readonly tiamat_params: TiamatParams, // expected to be a copy from the matrix, which manages the original
-    public readonly dapp_params: PLifted<DP>,
+    public readonly tiamatParams: TiamatParams, // expected to be a copy from the matrix, which manages the original
+    public readonly dappParams: PLifted<DP>,
     public readonly eigenvectors: Array<KeyHash>,
-    public readonly current_cycle: Interval<bigint>,
+    public readonly currentCycle: Interval<bigint>,
   ) {
-    const fromMs = BigInt(this.current_cycle.from) * slotDurationMs_;
-    const toMs = BigInt(this.current_cycle.to) * slotDurationMs_;
+    const fromMs = BigInt(this.currentCycle.from) * slotDurationMs_;
+    const toMs = BigInt(this.currentCycle.to) * slotDurationMs_;
     assert(
       fromMs % slotDurationMs_ === 0n,
       `NexusState: fromMs % slotDurationMs !== 0: ${fromMs} / ${slotDurationMs} = ${
@@ -59,10 +59,10 @@ export class PNexusState<DP extends PDappParamsT> extends PObject<
   constructor(public readonly pdappParams: DP) {
     super(
       new PRecord({
-        tiamat_params: PTiamatParams.ptype, // expected to be a copy from the matrix, which manages the original
-        dapp_params: pdappParams,
+        tiamatParams: PTiamatParams.ptype, // expected to be a copy from the matrix, which manages the original
+        dappParams: pdappParams,
         eigenvectors: new PList(PKeyHash.ptype),
-        current_cycle: new PInterval(PInteger.ptype),
+        currentCycle: new PInterval(PInteger.ptype),
       }),
       NexusState,
       `NexusState`,

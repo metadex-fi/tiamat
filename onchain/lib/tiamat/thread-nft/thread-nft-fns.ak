@@ -18,7 +18,7 @@ fn from(
   trace seed.transaction_id
   trace @"seed.output_index"
   trace seed.output_index
-  trace bytearray.push(seed.transaction_id, seed.output_index) 
+  trace bytearray.push(seed.transaction_id, seed.output_index)
   seed.transaction_id
     |> bytearray.push(seed.output_index)
     |> crypto.blake2b_256
@@ -34,6 +34,7 @@ pub fn mk_thread_nft(
   this_policy: PolicyId,
   tx: tx.Transaction,
 ) -> Bool {
+  trace @"mk_thread_nft"
   let nexus_utxo =
     when nexus is {
       None -> None
@@ -46,54 +47,50 @@ pub fn mk_thread_nft(
         fn(nft_amount) {
           let Pair(nft, amount) = nft_amount
           let half_nft = bytearray.drop(nft, 16)
-          amount == -1 || (
-            trace list.length(tx.inputs)
-            amount == 1 && 
-            list.any(
-              tx.inputs,
-              fn(input) { 
-                let target = from(input.output_reference)
-                trace @"target"
-                trace target
-                trace @"half_nft"
-                trace half_nft
-                trace @"nft"
-                trace nft
-                target == half_nft
-              },
-            ) && 
-            list.any(
-              tx.outputs,
-              fn(output) { 
-                output.address == svm_address && 
-                {
-                  let token_pairs =
-                    output.value
-                      |> assets.tokens(this_policy)
-                      |> dict.to_pairs
-                  when token_pairs is {
-                    [Pair(id_nft, 1)] -> {
-                      let datum = extraction_fn(output)
+          (amount == -1)
+          || {
+          trace list.length(tx.inputs)
 
-                      (this_policy == datum.id.policy)? && 
-                      (nft == datum.id.name && nft == id_nft)? && starting_fn(
-                        nexus_utxo,
-                        datum.id,
-                        datum.config,
-                        // redeemer,
-                        datum.state,
-                        output.value,
-                        this_policy,
-                        tx,
-                      )?
-                    }
-                    [] -> fail @"no tokens"
-                    _ -> fail @"too many tokens"
+          amount == 1 && list.any(
+            tx.inputs,
+            fn(input) {
+              let target = from(input.output_reference)
+              trace @"target"
+              trace target
+              trace @"half_nft"
+              trace half_nft
+              trace @"nft"
+              trace nft
+              target == half_nft
+            },
+          ) && list.any(
+            tx.outputs,
+            fn(output) { output.address == svm_address && {
+                let token_pairs =
+                  output.value
+                    |> assets.tokens(this_policy)
+                    |> dict.to_pairs
+                when token_pairs is {
+                  [Pair(id_nft, 1)] -> {
+                    let datum = extraction_fn(output)
+
+                    (this_policy == datum.id.currency)? && (nft == datum.id.token && nft == id_nft)? && starting_fn(
+                      nexus_utxo,
+                      datum.id,
+                      datum.config,
+                      // redeemer,
+                      datum.state,
+                      output.value,
+                      this_policy,
+                      tx,
+                    )?
                   }
-                } 
-              },
-            )
+                  [] -> fail @"no tokens"
+                  _ -> fail @"too many tokens"
+                }
+              } },
           )
+          }
         },
       )
 }
@@ -107,6 +104,7 @@ pub fn autostarting(
   _new_value: Value,
   _tx: tx.Transaction,
 ) -> Bool {
+  trace @"autostarting"
   True
 }
 
@@ -121,6 +119,7 @@ pub fn mk_singleton(singleton_id: AssetName) {
     _this_policy: PolicyId,
     _tx: tx.Transaction,
   ) -> Bool {
-    id.name == singleton_id
+    trace @"mk_singleton"
+    id.token == singleton_id
   }
 }

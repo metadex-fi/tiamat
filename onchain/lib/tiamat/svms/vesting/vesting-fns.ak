@@ -70,10 +70,10 @@ pub fn unhinged(
     find_reference_svm(nexus_config.matrix, tx.reference_inputs)
   let e = extract_eigenwert(matrix)
   let claimed_e =
-    assets.quantity_of(old_value, e.policy, e.name) - assets.quantity_of(
+    assets.quantity_of(old_value, e.currency, e.token) - assets.quantity_of(
       new_value,
-      e.policy,
-      e.name,
+      e.currency,
+      e.token,
     )
 
   list.has(tx.extra_signatories, config.owner) && tx_valid_to <= new_state.time_lock && claimed_e <= claimable
@@ -108,10 +108,10 @@ pub fn halt(
   expect Some(matrix) =
     find_reference_svm(nexus_config.matrix, tx.reference_inputs)
   let e = extract_eigenwert(matrix)
-  let claimed_e = old_value |> assets.quantity_of(e.policy, e.name)
+  let claimed_e = old_value |> assets.quantity_of(e.currency, e.token)
 
   // -
-  // (new_value |> assets.quantity_of(e.policy, e.name))
+  // (new_value |> assets.quantity_of(e.currency, e.token))
   list.has(tx.extra_signatories, config.owner) && // tx_valid_to <= new_state.time_lock &&
   claimed_e <= claimable
 }

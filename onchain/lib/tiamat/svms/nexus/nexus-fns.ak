@@ -128,8 +128,8 @@ pub fn unhinged(
           fn(input) {
             assets.quantity_of(
               input.output.value,
-              config.matrix.policy,
-              config.matrix.name,
+              config.matrix.currency,
+              config.matrix.token,
             ) == 1
           },
         )

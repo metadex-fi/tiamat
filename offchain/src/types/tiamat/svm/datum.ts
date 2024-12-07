@@ -2,7 +2,12 @@ import { Generators } from "../../../utils/generators";
 import { Asset, PAsset } from "../../general/derived/asset/asset";
 import { PObject } from "../../general/fundamental/container/object";
 import { PRecord } from "../../general/fundamental/container/record";
-import { PData, PLifted } from "../../general/fundamental/type";
+import {
+  PBlueprint,
+  PData,
+  PLifted,
+  PBlueprinted,
+} from "../../general/fundamental/type";
 
 /**
  *

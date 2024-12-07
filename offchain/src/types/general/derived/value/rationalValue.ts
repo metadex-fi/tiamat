@@ -6,7 +6,7 @@ import { PRational, Rational } from "../rational";
 import { Assets, ccysTkns } from "../asset/assets";
 import { PWrapped } from "../../fundamental/container/wrapped";
 import { Asset } from "../asset/asset";
-import { f } from "../../fundamental/type";
+import { f, Wrapper } from "../../fundamental/type";
 import { PositiveValue } from "./positiveValue";
 
 const ccysTknsAmnts = new AssocMap<Currency, AssocMap<Token, Rational>>(
@@ -20,13 +20,16 @@ const tknsAmnts = new AssocMap<Token, Rational>((tkn) => tkn.show());
 /**
  *
  */
-export class RationalValue {
+export class RationalValue
+  implements Wrapper<`value`, AssocMap<Currency, AssocMap<Token, Rational>>>
+{
   public readonly typus = "RationalValue";
+  __wrapperBrand: `value` = `value`;
   /**
    *
    * @param value
    */
-  constructor(private value = ccysTknsAmnts.anew) {
+  constructor(public value = ccysTknsAmnts.anew) {
     RationalValue.assert(this);
   }
 
@@ -271,7 +274,11 @@ export class RationalValue {
 /**
  *
  */
-export class PRationalValue extends PWrapped<RationalValue> {
+export class PRationalValue extends PWrapped<
+  `value`,
+  PMap<PCurrency, PMap<PToken, PRational>>,
+  RationalValue
+> {
   /**
    *
    */
@@ -298,7 +305,11 @@ export class PRationalValue extends PWrapped<RationalValue> {
   /**
    *
    */
-  static override genPType(): PRationalValue {
+  static override genPType(): PWrapped<
+    `value`,
+    PMap<PCurrency, PMap<PToken, PRational>>,
+    RationalValue
+  > {
     return PRationalValue.ptype;
   }
 }

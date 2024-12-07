@@ -16,11 +16,11 @@ export class MatrixState {
   /**
    *
    * @param params
-   * @param eigen_values
+   * @param eigenValues
    */
   constructor(
     public readonly params: TiamatParams,
-    public readonly eigen_values: Array<EigenValue>,
+    public readonly eigenValues: Array<EigenValue>,
   ) {}
 }
 
@@ -35,7 +35,7 @@ export class PMatrixState extends PObject<MatrixState> {
     super(
       new PRecord({
         params: PTiamatParams.ptype,
-        eigen_values: new PList(PEigenValue.ptype),
+        eigenValues: new PList(PEigenValue.ptype),
       }),
       MatrixState,
       `MatrixState`,

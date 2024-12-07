@@ -10,7 +10,7 @@ import {
   ConstrData,
   Data,
   asCorePlutusData,
-  fromCorePlutusDatum,
+  fromCorePlutusConstr,
 } from "../../types/general/fundamental/type";
 import { SvmDatum } from "../../types/tiamat/svm/datum";
 import { Revolve, Halt, Wipe } from "../../types/tiamat/svm/redeemer";
@@ -112,7 +112,7 @@ export class TiamatSvmUtxo<
       datum,
       `SvmUtxo<${svm.label}>.parse: no constr inline datum in utxo`,
     );
-    const svmDatum = svm.psvmDatum.plift(fromCorePlutusDatum(datum));
+    const svmDatum = svm.psvmDatum.plift(fromCorePlutusConstr(datum));
 
     const blazeNFT = svmDatum.id.toBlaze();
     const numNFTs = utxo.core.output().amount().multiasset()?.get(blazeNFT);
@@ -349,9 +349,10 @@ export class TiamatSvmUtxo<
 
     let revolvingRedeemer: ConstrData<Data>;
     try {
+      const revolvingAction = new Revolve(action);
       revolvingRedeemer = this.svm.psvmRedeemer.pconstant(
         // type === "unhinged" ? new Unhinged(action) :
-        new Revolve(action),
+        revolvingAction,
       );
     } catch (err) {
       throw new Error(

@@ -37,7 +37,7 @@ pub fn find_reference_svm(
   list.find(
     reference_inputs,
     fn(input) {
-      assets.quantity_of(input.output.value, id.policy, id.name) == 1
+      assets.quantity_of(input.output.value, id.currency, id.token) == 1
     },
   )
 }

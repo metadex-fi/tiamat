@@ -3,12 +3,14 @@ import { Core } from "@blaze-cardano/sdk";
 import { PWrapped } from "../../fundamental/container/wrapped";
 import { Hash } from "./hash";
 import { PString } from "../../fundamental/primitive/string";
+import { Wrapper } from "../../fundamental/type";
 
 /**
  *
  */
-export class KeyHash {
+export class KeyHash implements Wrapper<`keyHash`, Core.Ed25519KeyHashHex> {
   public readonly typus = "KeyHash";
+  __wrapperBrand: `keyHash` = `keyHash`;
   /**
    *
    * @param keyHash
@@ -122,7 +124,7 @@ export class KeyHash {
 /**
  *
  */
-export class PKeyHash extends PWrapped<KeyHash> {
+export class PKeyHash extends PWrapped<`keyHash`, PString, KeyHash> {
   /**
    *
    */
@@ -138,7 +140,7 @@ export class PKeyHash extends PWrapped<KeyHash> {
   /**
    *
    */
-  static override genPType(): PWrapped<KeyHash> {
+  static override genPType(): PWrapped<`keyHash`, PString, KeyHash> {
     return PKeyHash.ptype;
   }
 }

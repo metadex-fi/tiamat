@@ -42,27 +42,6 @@ export interface MintingPolicy {
   currency: Currency;
 }
 
-export interface BPAddress {
-  paymentCredential: { VerificationKey: [string] } | { Script: [string] };
-  stakeCredential:
-    | {
-        Inline: [
-          | {
-              VerificationKey: [string];
-            }
-          | { Script: [string] },
-        ];
-      }
-    | {
-        Pointer: {
-          slotNumber: bigint;
-          transactionIndex: bigint;
-          certificateIndex: bigint;
-        };
-      }
-    | null;
-}
-
 /**
  *
  */
@@ -109,7 +88,7 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
       Address.fromBlaze(
         Core.addressFromValidator(networkId, nexusSvmValidator),
       ),
-    ) as BPAddress;
+    ); //as BPAddress;
     this.log(`nexusAddress: ${JSON.stringify(nexusAddress)}`);
     this.log(`nexusID.toBlaze(): ${JSON.stringify(nexusID.toBlaze())}`);
     const nexusNftPolicy: Core.Script = new V3NexusNftPolicy(
@@ -140,7 +119,7 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
       Address.fromBlaze(
         Core.addressFromValidator(networkId, matrixSvmValidator),
       ),
-    ) as BPAddress;
+    );
     const matrixNftPolicy: Core.Script = new V3MatrixNftPolicy(
       matrixAddress,
       this.bpNexus,
@@ -164,7 +143,7 @@ export class TiamatContract<DC extends PDappConfigT, DP extends PDappParamsT> {
       Address.fromBlaze(
         Core.addressFromValidator(networkId, vestingSvmValidator),
       ),
-    ) as BPAddress;
+    );
     const vestingNftPolicy: Core.Script = new V3VestingNftPolicy(
       vestingAddress,
     );

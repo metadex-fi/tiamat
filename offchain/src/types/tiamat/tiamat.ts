@@ -108,26 +108,26 @@ export class TiamatParams {
   typus = "TiamatParams";
   /**
    *
-   * @param min_stake
-   * @param cycle_duration
-   * @param margin_duration
-   * @param hinge_lock
-   * @param num_eigenvectors
-   * @param num_support_vectors
-   * @param suggested_tip
-   * @param vesting_policy
-   * @param vesting_rate
+   * @param minStake
+   * @param cycleDuration
+   * @param marginDuration
+   * @param hingeLock
+   * @param numEigenvectors
+   * @param numSupportVectors
+   * @param suggestedTip
+   * @param vestingPolicy
+   * @param vestingRate
    */
   constructor(
-    public readonly min_stake: bigint, // to register a vector
-    public readonly cycle_duration: bigint,
-    public readonly margin_duration: bigint, // safety margin before end of cycle
-    public readonly hinge_lock: bigint, // if vectors get lazy, anyone can revolve
-    public readonly num_eigenvectors: bigint,
-    public readonly num_support_vectors: bigint, // minimum required to pass
-    public readonly suggested_tip: bigint, // Shelling point for minimum vector tips
-    public readonly vesting_policy: Currency,
-    public readonly vesting_rate: Rational, // tokens released per second
+    public readonly minStake: bigint, // to register a vector
+    public readonly cycleDuration: bigint,
+    public readonly marginDuration: bigint, // safety margin before end of cycle
+    public readonly hingeLock: bigint, // if vectors get lazy, anyone can revolve
+    public readonly numEigenvectors: bigint,
+    public readonly numSupportVectors: bigint, // minimum required to pass
+    public readonly suggestedTip: bigint, // Shelling point for minimum vector tips
+    public readonly vestingPolicy: Currency,
+    public readonly vestingRate: Rational, // tokens released per second
     // ~ add your own here ~
   ) {}
 
@@ -135,7 +135,7 @@ export class TiamatParams {
    *
    */
   public get fixedFees(): bigint {
-    return this.suggested_tip * this.num_support_vectors + txFees;
+    return this.suggestedTip * this.numSupportVectors + txFees;
   }
 
   /**
@@ -144,15 +144,15 @@ export class TiamatParams {
    */
   public equals = (other: TiamatParams) => {
     return (
-      this.min_stake === other.min_stake &&
-      this.cycle_duration === other.cycle_duration &&
-      this.margin_duration === other.margin_duration &&
-      this.hinge_lock === other.hinge_lock &&
-      this.num_eigenvectors === other.num_eigenvectors &&
-      this.num_support_vectors === other.num_support_vectors &&
-      this.suggested_tip === other.suggested_tip &&
-      this.vesting_policy.equals(other.vesting_policy) &&
-      this.vesting_rate.equals(other.vesting_rate)
+      this.minStake === other.minStake &&
+      this.cycleDuration === other.cycleDuration &&
+      this.marginDuration === other.marginDuration &&
+      this.hingeLock === other.hingeLock &&
+      this.numEigenvectors === other.numEigenvectors &&
+      this.numSupportVectors === other.numSupportVectors &&
+      this.suggestedTip === other.suggestedTip &&
+      this.vestingPolicy.equals(other.vestingPolicy) &&
+      this.vestingRate.equals(other.vestingRate)
       // ~ add your own here ~
     );
   };
@@ -162,20 +162,17 @@ export class TiamatParams {
    * @param vesting_policy
    */
   public withVestingPolicy = (vesting_policy: Currency): TiamatParams => {
-    assert(
-      this.vesting_policy === Currency.dummy,
-      `Vesting policy already set`,
-    );
+    assert(this.vestingPolicy === Currency.dummy, `Vesting policy already set`);
     return new TiamatParams(
-      this.min_stake,
-      this.cycle_duration,
-      this.margin_duration,
-      this.hinge_lock,
-      this.num_eigenvectors,
-      this.num_support_vectors,
-      this.suggested_tip,
+      this.minStake,
+      this.cycleDuration,
+      this.marginDuration,
+      this.hingeLock,
+      this.numEigenvectors,
+      this.numSupportVectors,
+      this.suggestedTip,
       vesting_policy,
-      this.vesting_rate,
+      this.vestingRate,
       // ~ add your own here ~
     );
   };

@@ -15,6 +15,7 @@ validator svm_validator {
     utxo: tx.OutputReference,
     tx: tx.Transaction,
   ) {
+    trace @"matrix svm_validator"
     expect Some(datum): Option<MatrixDatum> = datum
     mk_validator(
       None,
@@ -30,7 +31,7 @@ validator svm_validator {
   }
 
   else(_) {
-    fail
+    fail @"matrix svm_validator: not spend"
   }
 }
 
@@ -48,6 +49,6 @@ validator nft_policy(matrix_address: Address, nexus: Asset) {
   }
 
   else(_) {
-    fail
+    fail @"matrix nft_policy: not mint"
   }
 }

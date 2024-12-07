@@ -6,7 +6,15 @@ import {
   min,
   randomChoice,
 } from "../../../../utils/generators";
-import { f, PBlueprint, PConstanted, PData, PLifted, PType, t } from "../type";
+import {
+  f,
+  PConstanted,
+  PData,
+  PLifted,
+  PType,
+  PBlueprinted,
+  t,
+} from "../type";
 import { PList } from "./list";
 import { gMaxLength, maxShowDepth } from "../../../../utils/constants";
 
@@ -243,7 +251,8 @@ export class PMap<PKey extends PData, PValue extends PData>
   implements
     PType<
       Map<PConstanted<PKey>, PConstanted<PValue>>,
-      AssocMap<PLifted<PKey>, PLifted<PValue>>
+      AssocMap<PLifted<PKey>, PLifted<PValue>>,
+      Map<PBlueprinted<PKey>, PBlueprinted<PValue>>
     >
 {
   public readonly population: bigint | undefined;
@@ -366,7 +375,7 @@ export class PMap<PKey extends PData, PValue extends PData>
    */
   public pblueprint = (
     data: AssocMap<PLifted<PKey>, PLifted<PValue>>,
-  ): Map<PBlueprint, PBlueprint> => {
+  ): Map<PBlueprinted<PKey>, PBlueprinted<PValue>> => {
     assert(data instanceof AssocMap, `AssocMap.pblueprint: expected AssocMap`);
     assert(
       !this.size || this.size === BigInt(data.size),
@@ -378,7 +387,7 @@ export class PMap<PKey extends PData, PValue extends PData>
     );
     if (this.sorted) data.sort(); //NOTE this tricks our type-tests, but that's ok
 
-    const m = new Map<PBlueprint, PBlueprint>();
+    const m = new Map<PBlueprinted<PKey>, PBlueprinted<PValue>>();
     let i = 0;
     data.forEach((value, key) => {
       const k = this.pkey.pblueprint(key);
@@ -389,7 +398,10 @@ export class PMap<PKey extends PData, PValue extends PData>
         ${this.pkey.showPType("", maxShowDepth)}
         =!= ${k ? k.toString() : k}`,
       );
-      m.set(k, this.pvalue.pblueprint(value));
+      m.set(
+        k as PBlueprinted<PKey>,
+        this.pvalue.pblueprint(value) as PBlueprinted<PValue>,
+      );
     });
     return m;
   };

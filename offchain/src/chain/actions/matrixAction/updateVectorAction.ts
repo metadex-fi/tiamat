@@ -35,7 +35,7 @@ export class UpdateVectorAction implements UnhingedAction<MatrixUtxo, `owner`> {
     console.log(`UpdateVectorAction: ${vector}, ${ip}, ${port}`);
     assert(matrixUtxo.svmDatum, `UpdateVector: no svmDatum in matrixUtxo`);
 
-    const index = matrixUtxo.svmDatum.state.eigen_values.findIndex(
+    const index = matrixUtxo.svmDatum.state.eigenValues.findIndex(
       (ev) => ev.vector.keyHash === this.vector.keyHash,
     );
     assert(index !== -1, `UpdateVector: vector not registered: ${this.vector}`);
@@ -47,8 +47,8 @@ export class UpdateVectorAction implements UnhingedAction<MatrixUtxo, `owner`> {
       new UpdateVector(ip, BigInt(port)),
     );
 
-    const post = oldState.eigen_values.slice(index + 1);
-    const eigenValue = oldState.eigen_values[index]!;
+    const post = oldState.eigenValues.slice(index + 1);
+    const eigenValue = oldState.eigenValues[index]!;
     const port_ = BigInt(port);
     assert(
       ip !== eigenValue.ip || port_ !== eigenValue.port,
@@ -61,7 +61,7 @@ export class UpdateVectorAction implements UnhingedAction<MatrixUtxo, `owner`> {
       ip,
       port_,
     );
-    const pre = oldState.eigen_values.slice(0, index);
+    const pre = oldState.eigenValues.slice(0, index);
     this.newState = new MatrixState(oldState.params, [
       ...pre,
       eigenValue_,

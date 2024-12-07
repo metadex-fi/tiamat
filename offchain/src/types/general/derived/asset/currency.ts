@@ -2,12 +2,14 @@ import assert from "assert";
 import { Core } from "@blaze-cardano/sdk";
 import { PWrapped } from "../../fundamental/container/wrapped";
 import { PByteString } from "../../fundamental/primitive/bytestring";
+import { Wrapper } from "../../fundamental/type";
 
 /**
  *
  */
-export class Currency {
+export class Currency implements Wrapper<`symbol`, Uint8Array> {
   public readonly typus = "Currency";
+  __wrapperBrand: `symbol` = `symbol`;
   /**
    *
    * @param symbol
@@ -100,7 +102,7 @@ export class Currency {
 /**
  *
  */
-export class PCurrency extends PWrapped<Currency> {
+export class PCurrency extends PWrapped<`symbol`, PByteString, Currency> {
   /**
    *
    */
@@ -131,7 +133,7 @@ export class PCurrency extends PWrapped<Currency> {
   /**
    *
    */
-  static override genPType(): PWrapped<Currency> {
+  static override genPType(): PWrapped<`symbol`, PByteString, Currency> {
     return PCurrency.ptype;
   }
 }

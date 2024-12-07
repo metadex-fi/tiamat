@@ -43,7 +43,7 @@ export class RegisterVectorAction
     );
     assert(matrixUtxo.svmDatum, `RegisterVector: no svmDatum in matrixUtxo`);
     assert(
-      matrixUtxo.svmDatum.state.eigen_values.every(
+      matrixUtxo.svmDatum.state.eigenValues.every(
         (ev) => ev.vector.keyHash !== vector.keyHash,
       ),
       `RegisterVector: vector already registered: ${vector}`,
@@ -60,9 +60,7 @@ export class RegisterVectorAction
     );
 
     const start =
-      oldState.eigen_values.length > 0
-        ? oldState.eigen_values[0]!.end + 1n
-        : 0n;
+      oldState.eigenValues.length > 0 ? oldState.eigenValues[0]!.end + 1n : 0n;
     const end = start + this.stakedAmount;
     const eigenValue = new EigenValue(
       start,
@@ -73,7 +71,7 @@ export class RegisterVectorAction
     );
     this.newState = new MatrixState(oldState.params, [
       eigenValue,
-      ...oldState.eigen_values,
+      ...oldState.eigenValues,
     ]);
 
     this.newValue = oldValue.clone;

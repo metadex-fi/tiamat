@@ -73,7 +73,7 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
   ) {
     assert(nexusUtxo.svmDatum, `Elect: no svmDatum in nexusUtxo`);
     const oldState = nexusUtxo.svmDatum.state;
-    const dappParams = oldState.dapp_params;
+    const dappParams = oldState.dappParams;
     const onChainEVs = oldState.eigenvectors;
 
     assert(matrixUtxo.svmDatum, `Elect: no svmDatum in matrixUtxo`);
@@ -81,7 +81,7 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
 
     const matrixState = matrixUtxo.svmDatum.state;
     const tiamatParams = matrixState.params;
-    const eigenValues = matrixState.eigen_values;
+    const eigenValues = matrixState.eigenValues;
     if (logRegistered) {
       console.log(
         `[${name}]`,
@@ -93,9 +93,9 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
 
     // TODO are we at seconds or milliseconds onchain now?
     // TODO and what about that nonsense that Blaze does to validity intervals?
-    const cycleDurationMs = tiamatParams.cycle_duration; // milliseconds
-    const oldFromMs = oldState.current_cycle.from; // milliseconds
-    const oldToMs = oldState.current_cycle.to; // milliseconds
+    const cycleDurationMs = tiamatParams.cycleDuration; // milliseconds
+    const oldFromMs = oldState.currentCycle.from; // milliseconds
+    const oldToMs = oldState.currentCycle.to; // milliseconds
 
     let fromMs = forCycle === "current" ? oldFromMs : oldToMs; // milliseconds
 
@@ -129,7 +129,7 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
     const eligibleEVs: EigenValue[] = [];
     if (eigenValues.length) {
       const loop = eigenValues[0]!.end + 1n;
-      for (let n = 0; n < tiamatParams.num_eigenvectors; n++) {
+      for (let n = 0; n < tiamatParams.numEigenvectors; n++) {
         hash = blake.blake2b(hash); // NOTE using blake directly here instead of Blaze
         const roll =
           hash.reduce((acc, val) => (acc << 8n) | BigInt(val), 0n) % loop;
@@ -156,8 +156,8 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
     }
 
     assert(
-      fromMs + tiamatParams.cycle_duration === toMs,
-      `ElectionData: fromMs + params.cycle_duration !== toMs: ${fromMs} + ${tiamatParams.cycle_duration} !== ${toMs}`,
+      fromMs + tiamatParams.cycleDuration === toMs,
+      `ElectionData: fromMs + params.cycle_duration !== toMs: ${fromMs} + ${tiamatParams.cycleDuration} !== ${toMs}`,
     );
     // console.log( // TODO FIXME
     //   `${forCycle} ElectionData: withinMargin? ${withinMargin}` // NOTE this is mostly for the asserts below
@@ -185,7 +185,7 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
         };
 
     if (blocksUntilBoundary <= 1) {
-      const margin = Number(tiamatParams.margin_duration);
+      const margin = Number(tiamatParams.marginDuration);
       if (untilBoundaryMs <= margin) {
         phase = {
           type: `within single margin`,
@@ -308,7 +308,7 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
     let now = BigInt(Date.now());
     let nextBoundary = this.forCycle === `current` ? this.toMs : this.fromMs;
     // const nextBoundary = now < this.fromMs ? this.fromMs : this.toMs; // TODO not too sure about this either
-    let marginStart = nextBoundary - this.tiamatParams.margin_duration;
+    let marginStart = nextBoundary - this.tiamatParams.marginDuration;
     // const zeroTime = Core.SLOT_CONFIG_NETWORK['Custom'].zeroTime; // TODO hardcoding, but it's only for logging
     // console.log(`current slot:`, (Number(now) - zeroTime) / slotDurationMs);
     // console.log(
@@ -333,8 +333,8 @@ export class ElectionData<DC extends PDappConfigT, DP extends PDappParamsT>
         throw new Error(msg);
       } else {
         console.log(msg);
-        nextBoundary += this.tiamatParams.cycle_duration;
-        marginStart += this.tiamatParams.cycle_duration;
+        nextBoundary += this.tiamatParams.cycleDuration;
+        marginStart += this.tiamatParams.cycleDuration;
         now = BigInt(Date.now());
         // console.log(`current slot:`, (Number(now) - zeroTime) / slotDurationMs);
         // console.log(
