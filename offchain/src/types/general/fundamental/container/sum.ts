@@ -14,17 +14,24 @@ import {
   PBlueprinted,
   t,
   TObject,
+  PObjectBP,
 } from "../type";
 import { PObject } from "./object";
 import { PRecord } from "./record";
 import { PInteger } from "../primitive/integer";
 import { PByteString } from "../primitive/bytestring";
 
+export type SumBP<Os extends TObject[]> = {
+  [Index in keyof Os]: Os[Index] extends { typus: infer T }
+    ? { [K in Extract<T, string>]: PObjectBP<Os[Index]> }
+    : never;
+}[number];
+
 /**
  *
  */
 export class PSum<Os extends TObject[]>
-  implements PType<ConstrData<Data[]>, Os[number]>
+  implements PType<ConstrData<Data[]>, Os[number], SumBP<Os>>
 {
   public readonly population: bigint | undefined;
   /**
@@ -33,7 +40,7 @@ export class PSum<Os extends TObject[]>
    */
   constructor(
     public readonly pconstrs: {
-      [I in keyof Os]: Os[I] extends TObject ? PObject<Os[I], any> : never;
+      [I in keyof Os]: Os[I] extends TObject ? PObject<Os[I]> : never;
     },
   ) {
     assert(pconstrs.length > 0, `PSum: expected at least one PObject`);
@@ -112,19 +119,18 @@ export class PSum<Os extends TObject[]>
    * @param data
    */
   // public pblueprint = (data: Os[I]): PBlueprinted => {
-  public pblueprint = <I extends number>(
-    data: Os[I],
-  ): Record<Os[I][`typus`], PBlueprinted<PObject<Os[I]>>> => {
+  public pblueprint = <I extends number>(data: Os[I]): SumBP<Os> => {
     const match = this.matchData(data);
 
     const matchBP = match.pblueprint(data);
 
-    const bp = {} as {
-      [key: string]: any;
+    const bp = {
+      [match.typus]: matchBP,
+    } as {
+      [K in Extract<Os[I]["typus"], string>]: PBlueprinted<this["pconstrs"][I]>;
     };
-    bp[match.typus] = matchBP;
 
-    return bp as Record<Os[I][`typus`], PBlueprinted<PObject<Os[I]>>>;
+    return bp;
   };
 
   /**

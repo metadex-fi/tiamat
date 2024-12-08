@@ -185,14 +185,14 @@ export class RationalValue
         //   `${asset.concise()}\n${amount.concise()} +\n${deposit} =\n${liquidity.concise()}`,
         // );
         assert(
-          !liquidity.isZero,
+          !liquidity.isZero(),
           `leftAddMultiply: zero liquidity for ${asset.concise()}`,
         );
         acc.multiplyWith(liquidity);
       }
     }
     assert(
-      !acc.isZero,
+      !acc.isZero(),
       `leftAddMultiply: zero invariant for ${this.concise()}`,
     );
     return acc;

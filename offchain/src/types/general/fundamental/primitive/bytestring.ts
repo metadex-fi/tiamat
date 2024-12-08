@@ -11,7 +11,7 @@ import { Core } from "@blaze-cardano/sdk";
 /**
  *
  */
-export class PByteString implements PType<Uint8Array, Uint8Array> {
+export class PByteString implements PType<Uint8Array, Uint8Array, string> {
   public readonly population;
 
   /**

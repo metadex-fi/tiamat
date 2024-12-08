@@ -23,7 +23,11 @@ import { gMaxLength } from "../../../../utils/constants";
  */
 export class PRecord<PFields extends PData>
   implements
-    PType<ConstrData<PConstanted<PFields>[]>, RecordOfMaybe<PLifted<PFields>>>
+    PType<
+      ConstrData<PConstanted<PFields>[]>,
+      RecordOfMaybe<PLifted<PFields>>,
+      RecordOfMaybe<PBlueprinted<PFields>>
+    >
 {
   public readonly population: bigint | undefined;
   private index = 0; // for sum types

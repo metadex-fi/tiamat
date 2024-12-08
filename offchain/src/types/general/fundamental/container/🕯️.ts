@@ -1,5 +1,4 @@
 export * from "./constraint";
-export * from "./enum";
 export * from "./list";
 export * from "./literal";
 export * from "./map";

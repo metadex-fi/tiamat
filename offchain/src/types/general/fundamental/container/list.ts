@@ -19,7 +19,12 @@ import { gMaxLength } from "../../../../utils/constants";
  *
  */
 export class PList<PElem extends PData>
-  implements PType<Array<PConstanted<PElem>>, Array<PLifted<PElem>>>
+  implements
+    PType<
+      Array<PConstanted<PElem>>,
+      Array<PLifted<PElem>>,
+      Array<PBlueprinted<PElem>>
+    >
 {
   public readonly population: bigint | undefined;
 

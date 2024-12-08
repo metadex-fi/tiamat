@@ -30,9 +30,9 @@ export class Rational {
   /**
    *
    */
-  public get isZero(): boolean {
+  public isZero = (): boolean => {
     return this.numerator === 0n;
-  }
+  };
 
   /**
    *
@@ -163,36 +163,36 @@ export class Rational {
   /**
    *
    */
-  public get floor(): bigint {
+  public floor = (): bigint => {
     return this.numerator / this.denominator;
-  }
+  };
 
   /**
    *
    */
-  public get ceil(): bigint {
+  public ceil = (): bigint => {
     return ceilDiv(this.numerator, this.denominator);
-  }
+  };
 
   /**
    *
    */
-  public get round(): bigint {
-    const floor = this.floor;
+  public round = (): bigint => {
+    const floor = this.floor();
     const remainder = this.numerator % this.denominator;
     if (remainder * 2n >= this.denominator) {
       return floor + 1n;
     } else {
       return floor;
     }
-  }
+  };
 
   /**
    *
    */
-  public get recip(): Rational {
+  public recip = (): Rational => {
     return new Rational(this.denominator, this.numerator);
-  }
+  };
 
   /**
    *
@@ -276,11 +276,11 @@ export class Rational {
   /**
    *
    */
-  public get sqrt(): Rational {
+  public sqrt = (): Rational => {
     const sqrtNumerator = Rational.sqrtBigint(this.numerator);
     const sqrtDenominator = Rational.sqrtBigint(this.denominator);
     return new Rational(sqrtNumerator, sqrtDenominator);
-  }
+  };
 
   /**
    *
@@ -295,7 +295,7 @@ export class Rational {
   /**
    *
    */
-  public get reduced(): Rational {
+  public reduced = (): Rational => {
     const gcd =
       this.numerator === 0n
         ? this.denominator
@@ -303,7 +303,7 @@ export class Rational {
           ? -Rational.gcd(-this.numerator, this.denominator)
           : Rational.gcd(this.numerator, this.denominator);
     return new Rational(this.numerator / gcd, this.denominator / gcd);
-  }
+  };
 
   /**
    *
@@ -311,7 +311,7 @@ export class Rational {
   public static genNonNegative(): Rational {
     const numerator = genNonNegative();
     const denominator = genPositive();
-    return new Rational(numerator, denominator).reduced;
+    return new Rational(numerator, denominator).reduced();
   }
 
   /**
@@ -320,7 +320,7 @@ export class Rational {
   public static genPositive(): Rational {
     const numerator = genPositive();
     const denominator = genPositive();
-    return new Rational(numerator, denominator).reduced;
+    return new Rational(numerator, denominator).reduced();
   }
 }
 

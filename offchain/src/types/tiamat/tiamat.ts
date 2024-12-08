@@ -134,9 +134,9 @@ export class TiamatParams {
   /**
    *
    */
-  public get fixedFees(): bigint {
+  public fixedFees = (): bigint => {
     return this.suggestedTip * this.numSupportVectors + txFees;
-  }
+  };
 
   /**
    *

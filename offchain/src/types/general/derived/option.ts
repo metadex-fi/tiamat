@@ -47,13 +47,13 @@ class PSome<POf extends PData> extends PObject<Some<PLifted<POf>>> {
     );
   }
 
-  /**
-   *
-   * @param data
-   */
-  public override pblueprint = (data: Some<PLifted<POf>>) => {
-    return this.pof.pblueprint(data.of);
-  };
+  // /**
+  //  *
+  //  * @param data
+  //  */
+  // public override pblueprint = (data: Some<PLifted<POf>>) => {
+  //   return this.pof.pblueprint(data.of);
+  // };
 
   /**
    *
@@ -91,7 +91,7 @@ export class None {
 /**
  *
  */
-class PNone extends PObject<None> {
+class PNone extends PObject<None, `None`> {
   /**
    *
    */
@@ -99,17 +99,17 @@ class PNone extends PObject<None> {
     super(new PRecord({}), None, `None`);
   }
 
-  /**
-   *
-   * @param data
-   */
-  public override pblueprint = (data: None): PBlueprint => {
-    assert(
-      data.typus === "None",
-      `PNone.pblueprint: expected None, got ${data}`,
-    );
-    return null;
-  };
+  // /**
+  //  *
+  //  * @param data
+  //  */
+  // public override pblueprint = (data: None): PBlueprint => {
+  //   assert(
+  //     data.typus === "None",
+  //     `PNone.pblueprint: expected None, got ${data}`,
+  //   );
+  //   return null;
+  // };
 
   static ptype = new PNone();
   /**

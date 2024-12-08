@@ -1,16 +1,16 @@
 import assert from "assert";
 import { Generators, genPositive, maybeNdef } from "../../../utils/generators";
 import { PList } from "../fundamental/container/list";
-import { PData, PLifted } from "../fundamental/type";
+import { Decrement, MaxDepth, PData, PLifted } from "../fundamental/type";
 import { PConstraint } from "../fundamental/container/constraint";
 import { gMaxLength } from "../../../utils/constants";
 
 /**
  *
  */
-export class PNonEmptyList<PElem extends PData> extends PConstraint<
-  PList<PElem>
-> {
+export class PNonEmptyList<
+  PElem extends PData<Decrement<MaxDepth>>,
+> extends PConstraint<PList<PElem>> {
   /**
    *
    * @param pelem
@@ -38,9 +38,9 @@ export class PNonEmptyList<PElem extends PData> extends PConstraint<
   static override genPType(
     gen: Generators,
     maxDepth: bigint,
-  ): PConstraint<PList<PData>> {
+  ): PConstraint<PList<PData<Decrement<MaxDepth>>>> {
     const length = maybeNdef(genPositive(gMaxLength));
-    const pelem = gen.generate(maxDepth);
+    const pelem = gen.generate(maxDepth) as PData<Decrement<MaxDepth>>;
     return new PNonEmptyList(pelem, length);
   }
 }

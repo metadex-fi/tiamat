@@ -2,7 +2,7 @@ import { Generators } from "../../../utils/generators";
 import { PObject } from "../../general/fundamental/container/object";
 import { PRecord } from "../../general/fundamental/container/record";
 import { PSum } from "../../general/fundamental/container/sum";
-import { PData, PLifted } from "../../general/fundamental/type";
+import { PBlueprinted, PData, PLifted } from "../../general/fundamental/type";
 
 /**
  *
@@ -122,9 +122,11 @@ export class Halt<Action> {
 }
 
 /**
- *
+ * TODO un-export
  */
-class PHalt<PAction extends PData> extends PObject<Halt<PLifted<PAction>>> {
+export class PHalt<PAction extends PData> extends PObject<
+  Halt<PLifted<PAction>>
+> {
   /**
    *
    * @param paction
@@ -167,7 +169,7 @@ export class Wipe {
 /**
  *
  */
-class PWipe extends PObject<Wipe> {
+class PWipe extends PObject<Wipe, `Wipe`> {
   /**
    *
    */

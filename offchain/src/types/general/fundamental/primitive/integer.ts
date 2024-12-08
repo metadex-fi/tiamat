@@ -6,7 +6,7 @@ import { maxInteger } from "../../../../utils/constants";
 /**
  *
  */
-export class PInteger implements PType<bigint, bigint> {
+export class PInteger implements PType<bigint, bigint, bigint> {
   public readonly population = maxInteger * 2n + 1n;
 
   /**

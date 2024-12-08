@@ -1,6 +1,14 @@
 import assert from "assert";
 import { Generators } from "../../../../utils/generators";
-import { f, PBlueprint, PConstanted, PData, PLifted, PType, t } from "../type";
+import {
+  f,
+  PBlueprinted,
+  PConstanted,
+  PData,
+  PLifted,
+  PType,
+  t,
+} from "../type";
 
 export type PMaybeLiteral<T extends PData> = T | PLiteral<T>;
 
@@ -8,11 +16,11 @@ export type PMaybeLiteral<T extends PData> = T | PLiteral<T>;
  *
  */
 export class PLiteral<PT extends PData>
-  implements PType<PConstanted<PT>, PLifted<PT>>
+  implements PType<PConstanted<PT>, PLifted<PT>, PBlueprinted<PT>>
 {
   public population = 1n;
   private plutusLiteral: PConstanted<PT>;
-  private blueprintLiteral: PBlueprint;
+  private blueprintLiteral: PBlueprinted<PT>;
   private str: string;
   /**
    *
@@ -24,7 +32,7 @@ export class PLiteral<PT extends PData>
     public literal: PLifted<PT>,
   ) {
     this.plutusLiteral = pliteral.pconstant(literal) as PConstanted<PT>;
-    this.blueprintLiteral = pliteral.pblueprint(literal);
+    this.blueprintLiteral = pliteral.pblueprint(literal) as PBlueprinted<PT>;
     this.str = pliteral.showData(literal);
   }
 
@@ -60,7 +68,7 @@ export class PLiteral<PT extends PData>
    *
    * @param data
    */
-  public pblueprint = (data: PLifted<PT>): PBlueprint => {
+  public pblueprint = (data: PLifted<PT>): PBlueprinted<PT> => {
     assert(
       this.pliteral.showData(data) === this.str,
       `Literal.pblueprint: Literal does not match, got:\n${this.pliteral.showData(

@@ -9,6 +9,8 @@ T is the equivalent concrete type.
 
 import { Core } from "@blaze-cardano/sdk";
 import { assert } from "console";
+import { Currency } from "../derived/asset/currency";
+import { Asset } from "../derived/asset/asset";
 
 export class ConstrData<DataTs extends Data[]> {
   /**
@@ -23,6 +25,15 @@ export class ConstrData<DataTs extends Data[]> {
 }
 
 // export type DataSum = { [Index in keyof any[]]: Data };
+// export type Data = Data_<5>;
+
+// type Data_<Depth extends number> =
+//   | Uint8Array
+//   | bigint
+//   | Array<Data_<Decrement<Depth>>>
+//   | Map<Data_<Decrement<Depth>>, Data_<Decrement<Depth>>>
+//   | ConstrData<Data_<Decrement<Depth>>[]>;
+
 export type Data =
   | Uint8Array
   | bigint
@@ -406,11 +417,7 @@ export type RecordOfMaybe<T> = Record<string, T | undefined>;
 // Lifted-type, and vice versa; examples (Data -> LIfted):
 // 1. Array maps to Array (via PList), Record (via PRecord) and Object (via PObject)
 // 2. Array (via PObject) and Constr (via PSum) map to Object
-export interface PType<
-  D extends Data,
-  L,
-  BPType extends PBlueprint = DataBP<D>,
-> {
+export interface PType<D extends Data, L, BPType> {
   readonly population: bigint | undefined; // undefined means infinite TODO better way?
   plift(data: D): L;
   pconstant(data: L): D;
@@ -420,34 +427,54 @@ export interface PType<
   showPType(tabs?: string, maxDepth?: bigint): string;
 }
 
-export type PData = PType<Data, unknown, PBlueprint>;
-export type PLifted<P extends PData> = ReturnType<P["plift"]>;
-export type PConstanted<P extends PData> = ReturnType<P["pconstant"]>;
-export type PBlueprinted<P extends PData> = ReturnType<P["pblueprint"]>;
+export type MaxDepth = 10;
+export type PData<Depth extends number = MaxDepth> = PType<
+  Data,
+  unknown,
+  PBlueprint<Depth>
+>;
+export type PLifted<
+  P extends PData<Depth>,
+  Depth extends number = MaxDepth,
+> = ReturnType<P["plift"]>;
+export type PConstanted<
+  P extends PData<Depth>,
+  Depth extends number = MaxDepth,
+> = ReturnType<P["pconstant"]>;
+export type PBlueprinted<
+  P extends PData<Depth>,
+  Depth extends number = MaxDepth,
+> = ReturnType<P["pblueprint"]>;
 // export type PBlueprinted<P extends PData> = ReturnType<P['pblueprint']>;
-export type PBlueprint = Record<string, any> | PBlueprintSimple;
 
-type PBlueprintSimple =
-  | Array<PBlueprint>
-  | Map<PBlueprint, PBlueprint>
-  | bigint
-  | string
-  | boolean
-  | null
-  | undefined;
+type PBlueprint<Depth extends number> = Depth extends never
+  ? never
+  :
+      | Record<string, PBlueprint<Decrement<Depth>>>
+      | Array<PBlueprint<Decrement<Depth>>>
+      | Map<PBlueprint<Decrement<Depth>>, PBlueprint<Decrement<Depth>>>
+      | bigint
+      | string
+      | boolean
+      | null
+      | undefined;
 
-export type DataBP<DataT extends Data> = DataT extends Uint8Array
+export type DataBP<DataT extends Data> = DataBP_<DataT, 5>;
+type DataBP_<
+  DataT extends Data,
+  Depth extends number,
+> = DataT extends Uint8Array
   ? string
   : DataT extends bigint
     ? bigint
     : DataT extends Array<infer E extends Data>
-      ? Array<DataBP<E>>
+      ? Array<DataBP_<E, Decrement<Depth>>>
       : DataT extends Map<infer K extends Data, infer V extends Data>
-        ? Map<DataBP<K>, DataBP<V>>
+        ? Map<DataBP_<K, Decrement<Depth>>, DataBP_<V, Decrement<Depth>>>
         : DataT extends ConstrData<infer D extends Data[]>
-          ? // ? Record<string, DataBP<D[number]>> TODO FIXME
-            Record<string, any>
-          : never;
+          ? Record<string, DataBP_<D[number], Decrement<Depth>>>
+          : // Record<string, any>
+            never;
 
 export interface TObject extends Object {
   typus: string;
@@ -457,27 +484,74 @@ export type Wrapper<K extends string, InnerT> = { [P in K]: InnerT } & {
   __wrapperBrand: K;
 };
 
-export type PObjectBP<O extends TObject> =
-  O extends Wrapper<infer K, infer V>
-    ? PFieldBP<PWrapperPB<O[`__wrapperBrand`], O>>
+type NonNever<T> = {
+  [K in keyof T as T[K] extends never ? never : K]: T[K];
+};
+
+type ExcludeTypus<T> = {
+  [K in keyof T as K extends "typus" ? never : K]: T[K];
+};
+
+type Clean<T> = NonNever<ExcludeTypus<T>>;
+type UnOpaqueString<T> = T extends string & { __opaqueString: infer _ }
+  ? string
+  : T;
+
+export type PObjectBP<O extends TObject> = PObjectBP_<O, MaxDepth>;
+type PObjectBP_<O extends TObject, Depth extends number> = Clean<
+  PObjectBP__<O, Depth>
+>;
+type PObjectBP__<O extends TObject, Depth extends number> = Depth extends never
+  ? never
+  : O extends Wrapper<infer K, infer V>
+    ? PFieldBP<PWrapperPB<O[`__wrapperBrand`], O>, Decrement<Depth>>
     : {
-        [K in keyof O]: PFieldBP<O[K]>;
+        [K in keyof O]: PFieldBP<O[K], Decrement<Depth>>;
       };
 
 type PWrapperPB<K extends string, W extends Wrapper<any, any>> = W[K];
-type PFieldBP<T> = T extends TObject
-  ? PObjectBP<T> // Recurse if the field is TObject
-  : T extends Uint8Array
-    ? string
-    : T extends bigint
-      ? bigint
-      : T extends Array<infer E>
-        ? Array<PFieldBP<E>>
-        : T extends Map<infer K, infer V>
-          ? Map<PFieldBP<K>, PFieldBP<V>>
-          : T;
+type PFieldBP<T, Depth extends number> = Depth extends never
+  ? never
+  : T extends (...args: any[]) => any
+    ? never // Filter functions
+    : T extends TObject
+      ? PObjectBP_<T, Decrement<Depth>>
+      : BaseTransform<T, Decrement<Depth>>;
+
+type BaseTransform<T, Depth extends number> = T extends Uint8Array
+  ? string
+  : T extends bigint
+    ? bigint
+    : T extends Array<infer E>
+      ? Array<PFieldBP<E, Decrement<Depth>>>
+      : T extends Map<infer K, infer V>
+        ? Map<PFieldBP<K, Decrement<Depth>>, PFieldBP<V, Decrement<Depth>>>
+        : T extends string
+          ? UnOpaqueString<T>
+          : // : T extends Record<string, infer F>
+            //   ? Record<string, PFieldBP<F, Decrement<Depth>>>
+            T;
+
+type AAA = PObjectBP<Currency>;
+type BBB = PObjectBP<Asset>;
 
 // export type PTypeBP<P extends PData> = DataBP<PConstanted<P>>;
+
+export type Decrement<N extends number> = [
+  never, // 0
+  0, // 1
+  1, // 2
+  2, // 3
+  3, // 4
+  4, // 5
+  5, // 6
+  6, // 7
+  7, // 8
+  8, // 9
+  9, // 10
+  10, // 11
+  // Add more as needed
+][N];
 
 export const f = "+  ";
 export const t = "   ";

@@ -4,7 +4,6 @@ import {
   ConstrData,
   Data,
   f,
-  PBlueprint,
   PData,
   PObjectBP,
   PType,
@@ -29,10 +28,8 @@ export const filterFunctionsAndTypus = <O extends object>(o: O) =>
 /**
  *
  */
-export class PObject<
-  O extends TObject,
-  BPType extends PBlueprint = PObjectBP<O>,
-> implements PType<ConstrData<Data[]>, O, BPType>
+export class PObject<O extends TObject, BPType = PObjectBP<O>>
+  implements PType<ConstrData<Data[]>, O, BPType>
 {
   public readonly population: bigint | undefined;
   /**

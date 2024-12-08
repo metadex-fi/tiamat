@@ -1,9 +1,15 @@
 import { KeyHash, PKeyHash } from "../../../general/derived/hash/keyHash";
 import { PObject } from "../../../general/fundamental/container/object";
 import { PRecord } from "../../../general/fundamental/container/record";
-import { PSum } from "../../../general/fundamental/container/sum";
+import { PSum, SumBP } from "../../../general/fundamental/container/sum";
 import { PInteger } from "../../../general/fundamental/primitive/integer";
 import { PString } from "../../../general/fundamental/primitive/string";
+import {
+  PBlueprinted,
+  PObjectBP,
+  TObject,
+} from "../../../general/fundamental/type";
+import { PHalt } from "../../svm/redeemer";
 
 /**
  *
@@ -48,6 +54,15 @@ class PRegisterVector extends PObject<RegisterVector> {
   }
 }
 
+type RegisterBP = PBlueprinted<PRegisterVector>;
+type RegisterTarget = { ip: string; port: bigint };
+
+type RegisterConforms<T extends RegisterTarget> = T;
+type RegisterValidated = RegisterConforms<RegisterBP>;
+
+type RegisterConformsBack<T extends RegisterBP> = T;
+type RegisterValidatedBack = RegisterConformsBack<RegisterTarget>;
+
 /**
  *
  */
@@ -62,7 +77,7 @@ export class DeregisterVector {
 /**
  *
  */
-class PDeregisterVector extends PObject<DeregisterVector> {
+class PDeregisterVector extends PObject<DeregisterVector, `DeregisterVector`> {
   /**
    *
    */
@@ -93,7 +108,7 @@ export class ChangeStake {
 /**
  *
  */
-class PChangeStake extends PObject<ChangeStake> {
+class PChangeStake extends PObject<ChangeStake, `ChangeStake`> {
   /**
    *
    */
@@ -167,7 +182,10 @@ export class ChangeProtocolParams {
 /**
  *
  */
-class PChangeProtocolParams extends PObject<ChangeProtocolParams> {
+class PChangeProtocolParams extends PObject<
+  ChangeProtocolParams,
+  `ChangeProtocolParams`
+> {
   /**
    *
    */
@@ -186,10 +204,10 @@ class PChangeProtocolParams extends PObject<ChangeProtocolParams> {
 
 export type MatrixActionType =
   | RegisterVector
-  | DeregisterVector
-  | ChangeStake
-  | UpdateVector
-  | ChangeProtocolParams;
+  // | DeregisterVector
+  // | ChangeStake
+  | UpdateVector;
+// | ChangeProtocolParams;
 
 /**
  *
@@ -197,10 +215,10 @@ export type MatrixActionType =
 export class PMatrixActionType extends PSum<
   [
     RegisterVector,
-    DeregisterVector,
-    ChangeStake,
+    // DeregisterVector,
+    // ChangeStake,
     UpdateVector,
-    ChangeProtocolParams,
+    // ChangeProtocolParams,
   ]
 > {
   /**
@@ -209,10 +227,10 @@ export class PMatrixActionType extends PSum<
   private constructor() {
     super([
       PRegisterVector.ptype,
-      PDeregisterVector.ptype,
-      PChangeStake.ptype,
+      // PDeregisterVector.ptype,
+      // PChangeStake.ptype,
       PUpdateVector.ptype,
-      PChangeProtocolParams.ptype,
+      // PChangeProtocolParams.ptype,
     ]);
   }
 
@@ -224,6 +242,20 @@ export class PMatrixActionType extends PSum<
     return PMatrixActionType.ptype;
   }
 }
+
+type ActionTypeBP = PBlueprinted<PMatrixActionType>;
+type ActionTypeTarget =
+  | { RegisterVector: { ip: string; port: bigint } }
+  // | "DeregisterVector"
+  // | "ChangeStake"
+  | { UpdateVector: { ip: string; port: bigint } };
+// | "ChangeProtocolParams";
+
+type ActionTypeConforms<T extends ActionTypeTarget> = T;
+type ActionTypeValidated = ActionTypeConforms<ActionTypeBP>;
+
+type ActionTypeConformsBack<T extends ActionTypeBP> = T;
+type ActionTypeValidatedBack = ActionTypeConformsBack<ActionTypeTarget>;
 
 /**
  *
@@ -267,3 +299,22 @@ export class PMatrixAction extends PObject<MatrixAction> {
     return PMatrixAction.ptype;
   }
 }
+
+type HaltBP = PBlueprinted<PHalt<PMatrixAction>>;
+type HaltTarget = {
+  action: {
+    vector: string;
+    action:
+      | { RegisterVector: { ip: string; port: bigint } }
+      | "DeregisterVector"
+      | "ChangeStake"
+      | { UpdateVector: { ip: string; port: bigint } }
+      | "ChangeProtocolParams";
+  };
+};
+
+type HaltConforms<T extends HaltTarget> = T;
+type HaltValidated = HaltConforms<HaltBP>;
+
+type HaltConformsBack<T extends HaltBP> = T;
+type HaltValidatedBack = HaltConformsBack<HaltTarget>;
