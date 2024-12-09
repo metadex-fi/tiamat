@@ -9,8 +9,7 @@ T is the equivalent concrete type.
 
 import { Core } from "@blaze-cardano/sdk";
 import { assert } from "console";
-import { Currency } from "../derived/asset/currency";
-import { Asset } from "../derived/asset/asset";
+import { Void } from "../derived/void";
 
 export class ConstrData<DataTs extends Data[]> {
   /**
@@ -24,16 +23,6 @@ export class ConstrData<DataTs extends Data[]> {
   ) {}
 }
 
-// export type DataSum = { [Index in keyof any[]]: Data };
-// export type Data = Data_<5>;
-
-// type Data_<Depth extends number> =
-//   | Uint8Array
-//   | bigint
-//   | Array<Data_<Decrement<Depth>>>
-//   | Map<Data_<Decrement<Depth>>, Data_<Decrement<Depth>>>
-//   | ConstrData<Data_<Decrement<Depth>>[]>;
-
 export type Data =
   | Uint8Array
   | bigint
@@ -41,55 +30,6 @@ export type Data =
   | Map<Data, Data>
   | ConstrData<Data[]>;
 
-// export const Data_ = {
-//   to: (data: Data): Core.Datum | Core.Redeemer => {
-//     return Core.asCorePlutusData(Data.blaze(data));
-//   },
-//   from: (raw: Core.Datum | Core.Redeemer): Data => {
-//     return Data.plutus(Core.fromCorePlutusData(raw));
-//   },
-
-//   plutus: (data: Core.Data): Data => {
-//     if (typeof data === 'string') {
-//       return Core.fromHex(data);
-//     } else if (typeof data === 'bigint') {
-//       return data;
-//     } else if (data instanceof Array) {
-//       return data.map(Data.plutus);
-//     } else if (data instanceof Map) {
-//       return new Map(
-//         [...data.entries()].map(([k, v]) => [Data.plutus(k), Data.plutus(v)])
-//       );
-//     } else if (data instanceof ConstrDataPlutusData) {
-//       return new ConstrDataPlutusData(
-//         data.getAlternative(),
-//         data.getData().map(Data.plutus)
-//       );
-//     } else {
-//       throw new Error(`bytey: unknown data type ${data}`);
-//     }
-//   },
-
-//   blaze: (data: Data): Core.Data => {
-//     if (data instanceof Uint8Array) {
-//       return Core.toHex(data);
-//     } else if (typeof data === 'bigint') {
-//       return data;
-//     } else if (data instanceof Array) {
-//       return data.map(Data.blaze);
-//     } else if (data instanceof Map) {
-//       return new Map(
-//         [...data.entries()].map(([k, v]) => [Data.blaze(k), Data.blaze(v)])
-//       );
-//     } else if (data instanceof ConstrData) {
-//       return new ConstrData(data.index, data.fields.map(Data.blaze));
-//     } else {
-//       throw new Error(`stringy: unknown data type ${data}`);
-//     }
-//   },
-// };
-
-// export const Data = {
 /**
  *
  * @param data
@@ -320,97 +260,6 @@ export function fromCorePlutusData<DataT extends Data>(
   }
 }
 
-// from: (raw: Core.Datum | Core.Redeemer): Data => {
-//   return Data.plutus(Core.fromCorePlutusData(raw));
-// },
-
-// plutus: (data: Core.Data): Data => {
-//   if (typeof data === 'string') {
-//     return Core.fromHex(data);
-//   } else if (typeof data === 'bigint') {
-//     return data;
-//   } else if (data instanceof Array) {
-//     return data.map(Data.plutus);
-//   } else if (data instanceof Map) {
-//     return new Map(
-//       [...data.entries()].map(([k, v]) => [Data.plutus(k), Data.plutus(v)])
-//     );
-//   } else if (data instanceof ConstrDataPlutusData) {
-//     return new ConstrDataPlutusData(
-//       data.getAlternative(),
-//       data.getData().map(Data.plutus)
-//     );
-//   } else {
-//     throw new Error(`bytey: unknown data type ${data}`);
-//   }
-// },
-
-// blaze: (data: Data): Core.Data => {
-//   if (data instanceof Uint8Array) {
-//     return Core.toHex(data);
-//   } else if (typeof data === 'bigint') {
-//     return data;
-//   } else if (data instanceof Array) {
-//     return data.map(Data.blaze);
-//   } else if (data instanceof Map) {
-//     return new Map(
-//       [...data.entries()].map(([k, v]) => [Data.blaze(k), Data.blaze(v)])
-//     );
-//   } else if (data instanceof ConstrData) {
-//     return new ConstrData(data.index, data.fields.map(Data.blaze));
-//   } else {
-//     throw new Error(`stringy: unknown data type ${data}`);
-//   }
-// },
-// };
-
-// export function checkBlueprint(target: PBlueprint, actual: PBlueprint): string {
-//   if (typeof target === "bigint") {
-//     if (target === actual) {
-//       return "ok";
-//     } else {
-//       return `expected ${typeof target}, got ${typeof actual}`;
-//     }
-//   } else if (typeof target === "string") {
-//     if
-//   } else if (typeof target === "boolean") {
-//     return target === actual;
-//   } else if (target === null) {
-//     return actual === null;
-//   } else if (target === undefined) {
-//     return actual === undefined;
-//   } else if (target instanceof Array) {
-//     if (!(actual instanceof Array)) {
-//       return false;
-//     }
-//     if (target.length !== actual.length) {
-//       return false;
-//     }
-//     for (let i = 0; i < target.length; i++) {
-//       if (!checkBlueprint(target[i], actual[i])) {
-//         return false;
-//       }
-//     }
-//     return true;
-//   } else if (target instanceof Map) {
-//     if (!(actual instanceof Map)) {
-//       return false;
-//     }
-//     if (target.size !== actual.size) {
-//       return false;
-//     }
-//     for (const [k, v] of target.entries()) {
-//       if (!checkBlueprint(v, actual.get(k))) {
-//         return false;
-//       }
-//     }
-//     return true;
-//   } else {
-//     return false;
-//   }
-
-// }
-
 export type RecordOfMaybe<T> = Record<string, T | undefined>;
 
 // we need two types here, because we can both map multiple Data-types onto the same
@@ -498,14 +347,7 @@ export type SumBP<Os extends TObject[], Depth extends number = MaxDepth> = {
   [Index in keyof Os]: ConstituentBP<Os[Index], Depth>;
 }[number];
 
-// type MaybeSumBP<Os extends TObject[], Depth extends number = MaxDepth> =
-//   Os["length"] extends 1
-//     ? TObjectOrEmptyBP<Os[0], Depth> // Special handling for size 1
-//     : {
-//         [Index in keyof Os]: ConstituentBP<Os[Index], Depth>;
-//       }[number];
-
-type Freeze<T> = { __type: T };
+type Freeze<T> = { __type: T }; // to prevent premature splitting of unions
 
 type IsUnion<T, U = T> = T extends any
   ? [U] extends [T]
@@ -527,9 +369,12 @@ type TObjectOrEmptyBP<O extends TObject, Depth extends number> = O extends {
   typus: infer T;
 }
   ? keyof Clean<O> extends never
-    ? Extract<T, string>
+    ? SpecialEmptyBP<T> //Extract<T, TypusT>
     : TObjectBP<O, Decrement<Depth>>
   : never;
+
+// for various primitives
+type SpecialEmptyBP<T> = T extends "Void" ? undefined : T;
 
 type UnOpaqueString<T> = T extends string & { __opaqueString: infer _ }
   ? string
@@ -571,29 +416,6 @@ type FieldBP<
             ? TObjectOrEmptyBP<F, Decrement<Depth>>
             : BaseTransform<F, Decrement<Depth>>
     : never;
-
-// F extends (...args: any[]) => any
-//   ? never // Filter functions
-//   : F extends Wrapper<infer K, infer V>
-//     ? FieldBP<WrapperBP<F[`__wrapperBrand`], F>, Decrement<Depth>>
-//     : F extends TObject
-//       ? {
-//           [K in keyof F]: FieldBP<Freeze<F[K]>, Decrement<Depth>>;
-//         }
-//       : BaseTransform<F, Decrement<Depth>>;
-
-// type UnionFieldBP<F> = { unionDetected: true; value: F }
-// type NonUnionFieldBP<F> = { unionDetected: false; value: F }
-
-// type FieldBPOld<F, Depth extends number> = Depth extends never
-//   ? never
-//   : F extends (...args: any[]) => any
-//     ? never // Filter functions
-//     : F extends Wrapper<infer K, infer V>
-//       ? FieldBP<WrapperBP<F[`__wrapperBrand`], F>, Decrement<Depth>>
-//       : F extends TObject
-//         ? MaybeSumBP<[F], Decrement<Depth>>
-//         : BaseTransform<F, Decrement<Depth>>;
 
 type BaseTransform<T, Depth extends number> = T extends Uint8Array
   ? string

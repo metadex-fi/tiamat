@@ -28,8 +28,8 @@ export const filterFunctionsAndTypus = <O extends object>(o: O) =>
 /**
  *
  */
-export class PObject<O extends TObject, BPType = TObjectBP<O>>
-  implements PType<ConstrData<Data[]>, O, BPType>
+export class PObject<O extends TObject>
+  implements PType<ConstrData<Data[]>, O, TObjectBP<O>>
 {
   public readonly population: bigint | undefined;
   /**
@@ -83,13 +83,13 @@ export class PObject<O extends TObject, BPType = TObjectBP<O>>
    *
    * @param data
    */
-  public pblueprint = (data: O): BPType => {
+  public pblueprint = (data: O): TObjectBP<O> => {
     assert(
       data.typus === this.typus,
       `PObject.pblueprint: expected typus ${this.typus}, got ${data.typus}`,
     );
     const record = filterFunctionsAndTypus(data);
-    return this.precord.pblueprint(record) as BPType;
+    return this.precord.pblueprint(record) as TObjectBP<O>;
   };
 
   /**
@@ -154,7 +154,7 @@ ${tt})`;
    * @param _gen
    * @param _maxDepth
    */
-  static genPType(_gen: Generators, _maxDepth: bigint): PObject<any, any> {
+  static genPType(_gen: Generators, _maxDepth: bigint): PObject<any> {
     const precord = new PRecord<PByteString | PInteger>({
       s: PByteString.genPType(),
       i: PInteger.genPType(),

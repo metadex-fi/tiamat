@@ -1,11 +1,12 @@
 import assert from "assert";
 import { PObject } from "../fundamental/container/object";
 import { PRecord } from "../fundamental/container/record";
+import { TObject } from "../fundamental/type";
 
 /**
  *
  */
-export class Void {
+export class Void implements TObject {
   public readonly typus = "Void";
   /**
    *
@@ -16,7 +17,7 @@ export class Void {
 /**
  *
  */
-export class PVoid extends PObject<Void, undefined> {
+export class PVoid extends PObject<Void> {
   /**
    *
    */
