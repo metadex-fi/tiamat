@@ -2,38 +2,38 @@ import { Generators } from "../../../utils/generators";
 import { PObject } from "../../general/fundamental/container/object";
 import { PRecord } from "../../general/fundamental/container/record";
 import { PSum } from "../../general/fundamental/container/sum";
-import { PBlueprinted, PData, PLifted } from "../../general/fundamental/type";
+import { PData, PLifted } from "../../general/fundamental/type";
 
-/**
- *
- */
-export class Start {
-  public readonly typus = "Start";
-  /**
-   *
-   */
-  constructor() {}
-}
+// /**
+//  *
+//  */
+// export class Start {
+//   public readonly typus = "Start";
+//   /**
+//    *
+//    */
+//   constructor() {}
+// }
 
-/**
- *
- */
-class PStart extends PObject<Start> {
-  /**
-   *
-   */
-  private constructor() {
-    super(new PRecord({}), Start, `Start`);
-  }
+// /**
+//  *
+//  */
+// class PStart extends PObject<Start> {
+//   /**
+//    *
+//    */
+//   private constructor() {
+//     super(new PRecord({}), Start, `Start`);
+//   }
 
-  static ptype = new PStart();
-  /**
-   *
-   */
-  static override genPType(): PStart {
-    return PStart.ptype;
-  }
-}
+//   static ptype = new PStart();
+//   /**
+//    *
+//    */
+//   static override genPType(): PStart {
+//     return PStart.ptype;
+//   }
+// }
 
 // export class Unhinged<Action> {
 //   constructor(
@@ -188,13 +188,13 @@ class PWipe extends PObject<Wipe, `Wipe`> {
 
 export type SvmRedeemer<Action> =
   // | Unhinged<Action>
-  Revolve<Action> | Halt<Action> | Wipe | Start;
+  Revolve<Action> | Halt<Action> | Wipe;
 
 /**
  *
  */
 export class PSvmRedeemer<PAction extends PData> extends PSum<
-  [Revolve<PLifted<PAction>>, Halt<PLifted<PAction>>, Wipe, Start]
+  [Revolve<PLifted<PAction>>, Halt<PLifted<PAction>>, Wipe]
 > {
   /**
    *
@@ -206,7 +206,6 @@ export class PSvmRedeemer<PAction extends PData> extends PSum<
       new PRevolve(paction),
       new PHalt(paction),
       PWipe.ptype,
-      PStart.ptype,
     ]);
   }
 

@@ -1,12 +1,12 @@
 import { KeyHash, PKeyHash } from "../../../general/derived/hash/keyHash";
 import { PObject } from "../../../general/fundamental/container/object";
 import { PRecord } from "../../../general/fundamental/container/record";
-import { PSum, SumBP } from "../../../general/fundamental/container/sum";
+import { PSum } from "../../../general/fundamental/container/sum";
 import { PInteger } from "../../../general/fundamental/primitive/integer";
 import { PString } from "../../../general/fundamental/primitive/string";
 import {
   PBlueprinted,
-  PObjectBP,
+  TObjectBP,
   TObject,
 } from "../../../general/fundamental/type";
 import { PHalt } from "../../svm/redeemer";
@@ -202,11 +202,9 @@ class PChangeProtocolParams extends PObject<
   }
 }
 
-export type MatrixActionType =
-  | RegisterVector
-  // | DeregisterVector
-  // | ChangeStake
-  | UpdateVector;
+export type MatrixActionType = RegisterVector | DeregisterVector;
+// | ChangeStake
+// | UpdateVector
 // | ChangeProtocolParams;
 
 /**
@@ -215,9 +213,9 @@ export type MatrixActionType =
 export class PMatrixActionType extends PSum<
   [
     RegisterVector,
-    // DeregisterVector,
+    DeregisterVector,
     // ChangeStake,
-    UpdateVector,
+    // UpdateVector,
     // ChangeProtocolParams,
   ]
 > {
@@ -227,9 +225,9 @@ export class PMatrixActionType extends PSum<
   private constructor() {
     super([
       PRegisterVector.ptype,
-      // PDeregisterVector.ptype,
+      PDeregisterVector.ptype,
       // PChangeStake.ptype,
-      PUpdateVector.ptype,
+      // PUpdateVector.ptype,
       // PChangeProtocolParams.ptype,
     ]);
   }
@@ -246,9 +244,9 @@ export class PMatrixActionType extends PSum<
 type ActionTypeBP = PBlueprinted<PMatrixActionType>;
 type ActionTypeTarget =
   | { RegisterVector: { ip: string; port: bigint } }
-  // | "DeregisterVector"
-  // | "ChangeStake"
-  | { UpdateVector: { ip: string; port: bigint } };
+  | "DeregisterVector";
+// | "ChangeStake"
+// | { UpdateVector: { ip: string; port: bigint } }
 // | "ChangeProtocolParams";
 
 type ActionTypeConforms<T extends ActionTypeTarget> = T;
@@ -300,16 +298,31 @@ export class PMatrixAction extends PObject<MatrixAction> {
   }
 }
 
+type ActionBP = PBlueprinted<PMatrixAction>;
+type ActionTarget = {
+  vector: string;
+  action: { RegisterVector: { ip: string; port: bigint } } | "DeregisterVector";
+  // | "ChangeStake"
+  // | { UpdateVector: { ip: string; port: bigint } }
+  // | "ChangeProtocolParams";
+};
+
+type ActionConforms<T extends ActionTarget> = T;
+type ActionValidated = ActionConforms<ActionBP>;
+
+type ActionConformsBack<T extends ActionBP> = T;
+type ActionValidatedBack = ActionConformsBack<ActionTarget>;
+
 type HaltBP = PBlueprinted<PHalt<PMatrixAction>>;
 type HaltTarget = {
   action: {
     vector: string;
     action:
       | { RegisterVector: { ip: string; port: bigint } }
-      | "DeregisterVector"
-      | "ChangeStake"
-      | { UpdateVector: { ip: string; port: bigint } }
-      | "ChangeProtocolParams";
+      | "DeregisterVector";
+    // | "ChangeStake"
+    // | { UpdateVector: { ip: string; port: bigint } }
+    // | "ChangeProtocolParams";
   };
 };
 

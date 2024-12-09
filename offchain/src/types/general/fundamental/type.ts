@@ -493,49 +493,70 @@ type ExcludeTypus<T> = {
 };
 
 type Clean<T> = NonNever<ExcludeTypus<T>>;
+
+export type SumBP<Os extends TObject[], Depth extends number = MaxDepth> = {
+  [Index in keyof Os]: ConstituentBP<Os[Index], Depth>;
+}[number];
+
+type ConstituentBP<O extends TObject, Depth extends number> = O extends {
+  typus: infer T;
+}
+  ? keyof Clean<O> extends never
+    ? Extract<T, string>
+    : {
+        [K in Extract<T, string>]: TObjectBP<O, Decrement<Depth>>;
+      }
+  : never;
+
+type TObjectOrEmptyBP<O extends TObject, Depth extends number> = O extends {
+  typus: infer T;
+}
+  ? keyof Clean<O> extends never
+    ? Extract<T, string>
+    : TObjectBP<O, Decrement<Depth>>
+  : never;
+
 type UnOpaqueString<T> = T extends string & { __opaqueString: infer _ }
   ? string
   : T;
 
-export type PObjectBP<O extends TObject> = PObjectBP_<O, MaxDepth>;
-type PObjectBP_<O extends TObject, Depth extends number> = Clean<
-  PObjectBP__<O, Depth>
->;
-type PObjectBP__<O extends TObject, Depth extends number> = Depth extends never
+export type TObjectBP<
+  O extends TObject,
+  Depth extends number = MaxDepth,
+> = Clean<TObjectBP_<O, Depth>>;
+type TObjectBP_<O extends TObject, Depth extends number> = Depth extends never
   ? never
   : O extends Wrapper<infer K, infer V>
-    ? PFieldBP<PWrapperPB<O[`__wrapperBrand`], O>, Decrement<Depth>>
+    ?
+      FieldBP<WrapperBP<O[`__wrapperBrand`], O>, Decrement<Depth>>
     : {
-        [K in keyof O]: PFieldBP<O[K], Decrement<Depth>>;
+        [K in keyof O]: FieldBP<O[K], Decrement<Depth>>;
       };
 
-type PWrapperPB<K extends string, W extends Wrapper<any, any>> = W[K];
-type PFieldBP<T, Depth extends number> = Depth extends never
+type WrapperBP<K extends string, W extends Wrapper<any, any>> = W[K];
+type FieldBP<F, Depth extends number> = Depth extends never
   ? never
-  : T extends (...args: any[]) => any
+  : F extends (...args: any[]) => any
     ? never // Filter functions
-    : T extends TObject
-      ? PObjectBP_<T, Decrement<Depth>>
-      : BaseTransform<T, Decrement<Depth>>;
+    : F extends Wrapper<infer K, infer V>
+      ? FieldBP<WrapperBP<F[`__wrapperBrand`], F>, Decrement<Depth>>
+      : F extends TObject
+        ? ConstituentBP<F, Decrement<Depth>>
+        : BaseTransform<F, Decrement<Depth>>;
 
 type BaseTransform<T, Depth extends number> = T extends Uint8Array
   ? string
   : T extends bigint
     ? bigint
     : T extends Array<infer E>
-      ? Array<PFieldBP<E, Decrement<Depth>>>
+      ? Array<FieldBP<E, Decrement<Depth>>>
       : T extends Map<infer K, infer V>
-        ? Map<PFieldBP<K, Decrement<Depth>>, PFieldBP<V, Decrement<Depth>>>
+        ? Map<FieldBP<K, Decrement<Depth>>, FieldBP<V, Decrement<Depth>>>
         : T extends string
           ? UnOpaqueString<T>
           : // : T extends Record<string, infer F>
             //   ? Record<string, PFieldBP<F, Decrement<Depth>>>
             T;
-
-type AAA = PObjectBP<Currency>;
-type BBB = PObjectBP<Asset>;
-
-// export type PTypeBP<P extends PData> = DataBP<PConstanted<P>>;
 
 export type Decrement<N extends number> = [
   never, // 0

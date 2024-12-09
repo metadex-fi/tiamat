@@ -9,23 +9,16 @@ import {
   ConstrData,
   Data,
   f,
-  PData,
   PType,
-  PBlueprinted,
   t,
   TObject,
-  PObjectBP,
+  TObjectBP,
+  SumBP,
 } from "../type";
 import { PObject } from "./object";
 import { PRecord } from "./record";
 import { PInteger } from "../primitive/integer";
 import { PByteString } from "../primitive/bytestring";
-
-export type SumBP<Os extends TObject[]> = {
-  [Index in keyof Os]: Os[Index] extends { typus: infer T }
-    ? { [K in Extract<T, string>]: PObjectBP<Os[Index]> }
-    : never;
-}[number];
 
 /**
  *
@@ -40,7 +33,7 @@ export class PSum<Os extends TObject[]>
    */
   constructor(
     public readonly pconstrs: {
-      [I in keyof Os]: Os[I] extends TObject ? PObject<Os[I]> : never;
+      [I in keyof Os]: Os[I] extends TObject ? PObject<Os[I], unknown> : never;
     },
   ) {
     assert(pconstrs.length > 0, `PSum: expected at least one PObject`);
@@ -74,7 +67,8 @@ export class PSum<Os extends TObject[]>
     ${c.index} >= ${this.pconstrs.length}
     for ${this.showPType()}`,
     );
-    const pconstr: PObject<Os[typeof c.index]> = this.pconstrs[c.index]!;
+    const pconstr: PObject<Os[typeof c.index], unknown> =
+      this.pconstrs[c.index]!;
     return pconstr.plift(c);
   };
 
@@ -82,12 +76,14 @@ export class PSum<Os extends TObject[]>
    *
    * @param data
    */
-  private matchData = <I extends number>(data: Os[I]): PObject<Os[I]> => {
+  private matchData = <I extends number>(
+    data: Os[I],
+  ): PObject<Os[I], unknown> => {
     assert(
       data instanceof Object,
       `PSum.matchData: expected Object, got ${data.toString()}`,
     );
-    const matches = new Array<PObject<Os[I]>>();
+    const matches = new Array<PObject<Os[I], unknown>>();
     this.pconstrs.forEach((pconstr) => {
       if (data instanceof pconstr.O) {
         matches.push(pconstr);
@@ -126,9 +122,7 @@ export class PSum<Os extends TObject[]>
 
     const bp = {
       [match.typus]: matchBP,
-    } as {
-      [K in Extract<Os[I]["typus"], string>]: PBlueprinted<this["pconstrs"][I]>;
-    };
+    } as SumBP<Os>;
 
     return bp;
   };
