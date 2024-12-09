@@ -9,7 +9,7 @@ T is the equivalent concrete type.
 
 import { Core } from "@blaze-cardano/sdk";
 import { assert } from "console";
-import { Void } from "../derived/void";
+import { Inline } from "../derived/address";
 
 export class ConstrData<DataTs extends Data[]> {
   /**
@@ -276,7 +276,6 @@ export interface PType<D extends Data, L, BPType> {
   showPType(tabs?: string, maxDepth?: bigint): string;
 }
 
-export type MaxDepth = 10;
 export type PData<Depth extends number = MaxDepth> = PType<
   Data,
   unknown,
@@ -343,8 +342,8 @@ type ExcludeTypus<T> = {
 
 type Clean<T> = NonNever<ExcludeTypus<T>>;
 
-export type SumBP<Os extends TObject[], Depth extends number = MaxDepth> = {
-  [Index in keyof Os]: ConstituentBP<Os[Index], Depth>;
+export type SumBP<Os extends TObject[]> = {
+  [Index in keyof Os]: ConstituentBP<Os[Index], MaxDepth>;
 }[number];
 
 type Freeze<T> = { __type: T }; // to prevent premature splitting of unions
@@ -355,37 +354,61 @@ type IsUnion<T, U = T> = T extends any
     : true // It's a union
   : never;
 
+type SpecialBP<O extends TObject, T, Depth extends number> = T extends "Void"
+  ? undefined
+  : T extends "VerificationKey"
+    ? {
+        VerificationKey: [string];
+      }
+    : T extends "Script"
+      ? {
+          Script: [string];
+        }
+      : T extends "Inline"
+        ? O extends Inline<infer Of>
+          ? [FieldBP<Freeze<Of>, Decrement<Depth>>]
+          : never
+        : never;
+
 type ConstituentBP<O extends TObject, Depth extends number> = O extends {
   typus: infer T;
 }
-  ? keyof Clean<O> extends never
-    ? Extract<T, string>
-    : {
-        [K in Extract<T, string>]: TObjectBP<O, Decrement<Depth>>;
-      }
+  ? SpecialBP<O, T, Depth> extends never
+    ? keyof Clean<O> extends never
+      ? Extract<T, string>
+      : {
+          [K in Extract<T, string>]: CleanTObjectBP<O, Decrement<Depth>>;
+        }
+    : SpecialBP<O, T, Depth>
   : never;
 
-type TObjectOrEmptyBP<O extends TObject, Depth extends number> = O extends {
+type TObjectOrSpecialBP<O extends TObject, Depth extends number> = O extends {
   typus: infer T;
 }
-  ? keyof Clean<O> extends never
-    ? SpecialEmptyBP<T> //Extract<T, TypusT>
-    : TObjectBP<O, Decrement<Depth>>
+  ? SpecialBP<O, T, Depth> extends never
+    ? keyof Clean<O> extends never
+      ? T
+      : CleanTObjectBP<O, Decrement<Depth>>
+    : SpecialBP<O, T, Depth>
   : never;
 
-// for various primitives
-type SpecialEmptyBP<T> = T extends "Void" ? undefined : T;
+export type TObjectBP<
+  O extends TObject,
+  Depth extends number = MaxDepth,
+> = TObjectOrSpecialBP<O, Depth>;
 
 type UnOpaqueString<T> = T extends string & { __opaqueString: infer _ }
   ? string
   : T;
 
-export type TObjectBP<
-  O extends TObject,
-  Depth extends number = MaxDepth,
-> = Clean<TObjectBP_<O, Depth>>;
+type CleanTObjectBP<O extends TObject, Depth extends number> = Clean<
+  UncleanTObjectBP<O, Depth>
+>;
 
-type TObjectBP_<O extends TObject, Depth extends number> = Depth extends never
+type UncleanTObjectBP<
+  O extends TObject,
+  Depth extends number,
+> = Depth extends never
   ? never
   : O extends Wrapper<infer K, infer V>
     ? FieldBP<WrapperBP<O[`__wrapperBrand`], O>, Decrement<Depth>>
@@ -413,7 +436,7 @@ type FieldBP<
         : F extends Wrapper<infer K, infer V>
           ? FieldBP<WrapperBP<F[`__wrapperBrand`], F>, Decrement<Depth>>
           : F extends TObject
-            ? TObjectOrEmptyBP<F, Decrement<Depth>>
+            ? TObjectOrSpecialBP<F, Decrement<Depth>>
             : BaseTransform<F, Decrement<Depth>>
     : never;
 
@@ -447,8 +470,50 @@ export type Decrement<N extends number> = [
   8, // 9
   9, // 10
   10, // 11
+  11, // 12
+  12, // 13
+  13, // 14
+  14, // 15
+  15, // 16
+  16, // 17
+  17, // 18
+  18, // 19
+  19, // 20
+  20, // 21
+  21, // 22
+  22, // 23
+  23, // 24
+  24, // 25
+  25, // 26
+  26, // 27
+  27, // 28
+  28, // 29
+  29, // 30
+  30, // 31
+  31, // 32
+  32, // 33
+  33, // 34
+  34, // 35
+  35, // 36
+  36, // 37
+  37, // 38
+  38, // 39
+  39, // 40
+  40, // 41
+  41, // 42
+  42, // 43
+  43, // 44
+  44, // 45
+  45, // 46
+  46, // 47
+  47, // 48
+  48, // 49
+  49, // 50
+  50, // 51
+  51, // 52
   // Add more as needed
 ][N];
+export type MaxDepth = 20;
 
 export const f = "+  ";
 export const t = "   ";

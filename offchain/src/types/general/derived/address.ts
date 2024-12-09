@@ -1,7 +1,15 @@
 import { Generators } from "../../../utils/generators";
 import { PObject } from "../fundamental/container/object";
 import { PRecord } from "../fundamental/container/record";
-import { f, PData, PLifted } from "../fundamental/type";
+import {
+  Decrement,
+  f,
+  MaxDepth,
+  PBlueprinted,
+  PData,
+  PLifted,
+  TObjectBP,
+} from "../fundamental/type";
 import { KeyHash, PKeyHash } from "./hash/keyHash";
 import { PSum } from "../fundamental/container/sum";
 import { None, Option, POption } from "./option";
@@ -80,7 +88,11 @@ class PVerificationKey extends PObject<VerificationKey> {
    *
    * @param data
    */
-  public override pblueprint = (data: VerificationKey) => {
+  public override pblueprint = (
+    data: VerificationKey,
+  ): {
+    VerificationKey: [string];
+  } => {
     return {
       VerificationKey: [data.keyHash.toBlaze()], // TODO correct?
     };
@@ -160,7 +172,11 @@ class PScript extends PObject<Script> {
    *
    * @param data
    */
-  public override pblueprint = (data: Script) => {
+  public override pblueprint = (
+    data: Script,
+  ): {
+    Script: [string];
+  } => {
     return {
       Script: [data.keyHash.toBlaze()], // TODO correct?
     };
@@ -221,6 +237,9 @@ export class Inline<Of> {
   }
 }
 
+type AAA<POf extends PData> = TObjectBP<Inline<PLifted<POf>>>;
+type BBB = AAA<PCredential>;
+
 /**
  *
  */
@@ -243,7 +262,11 @@ class PInline<POf extends PData> extends PObject<Inline<PLifted<POf>>> {
    *
    * @param data
    */
-  public override pblueprint = (data: Inline<PLifted<POf>>) => {
+  public override pblueprint = (
+    data: Inline<PLifted<POf>>,
+  ): {
+    Inline: [PBlueprinted<POf>];
+  } => {
     return {
       Inline: [this.pof.pblueprint(data.of)], // TODO correct?
     };
@@ -508,7 +531,7 @@ export interface BPAddress {
 /**
  *
  */
-export class PAddress extends PObject<Address, BPAddress> {
+export class PAddress extends PObject<Address> {
   /**
    *
    */
