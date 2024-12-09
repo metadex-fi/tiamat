@@ -5,16 +5,7 @@ import {
   genPositive,
   randomChoice,
 } from "../../../../utils/generators";
-import {
-  ConstrData,
-  Data,
-  f,
-  PType,
-  t,
-  TObject,
-  TObjectBP,
-  SumBP,
-} from "../type";
+import { ConstrData, Data, f, PType, t, TObject, SumBP } from "../type";
 import { PObject } from "./object";
 import { PRecord } from "./record";
 import { PInteger } from "../primitive/integer";

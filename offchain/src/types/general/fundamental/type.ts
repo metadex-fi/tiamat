@@ -498,6 +498,21 @@ export type SumBP<Os extends TObject[], Depth extends number = MaxDepth> = {
   [Index in keyof Os]: ConstituentBP<Os[Index], Depth>;
 }[number];
 
+// type MaybeSumBP<Os extends TObject[], Depth extends number = MaxDepth> =
+//   Os["length"] extends 1
+//     ? TObjectOrEmptyBP<Os[0], Depth> // Special handling for size 1
+//     : {
+//         [Index in keyof Os]: ConstituentBP<Os[Index], Depth>;
+//       }[number];
+
+type Freeze<T> = { __type: T };
+
+type IsUnion<T, U = T> = T extends any
+  ? [U] extends [T]
+    ? false // Not a union, as `U` is not distributed
+    : true // It's a union
+  : never;
+
 type ConstituentBP<O extends TObject, Depth extends number> = O extends {
   typus: infer T;
 }
@@ -524,34 +539,73 @@ export type TObjectBP<
   O extends TObject,
   Depth extends number = MaxDepth,
 > = Clean<TObjectBP_<O, Depth>>;
+
 type TObjectBP_<O extends TObject, Depth extends number> = Depth extends never
   ? never
   : O extends Wrapper<infer K, infer V>
-    ?
-      FieldBP<WrapperBP<O[`__wrapperBrand`], O>, Decrement<Depth>>
+    ? FieldBP<WrapperBP<O[`__wrapperBrand`], O>, Decrement<Depth>>
     : {
-        [K in keyof O]: FieldBP<O[K], Decrement<Depth>>;
+        [K in keyof O]: FieldBP<Freeze<O[K]>, Decrement<Depth>>;
       };
 
-type WrapperBP<K extends string, W extends Wrapper<any, any>> = W[K];
-type FieldBP<F, Depth extends number> = Depth extends never
+type WrapperBP<K extends string, W extends Wrapper<any, any>> = Freeze<W[K]>;
+type FieldBP<
+  Frozen extends Freeze<any>,
+  Depth extends number,
+> = Depth extends never
   ? never
-  : F extends (...args: any[]) => any
-    ? never // Filter functions
-    : F extends Wrapper<infer K, infer V>
-      ? FieldBP<WrapperBP<F[`__wrapperBrand`], F>, Decrement<Depth>>
-      : F extends TObject
-        ? ConstituentBP<F, Decrement<Depth>>
-        : BaseTransform<F, Decrement<Depth>>;
+  : Frozen extends Freeze<infer F>
+    ? IsUnion<F> extends true
+      ? F extends (...args: any[]) => any
+        ? never // Filter functions
+        : F extends Wrapper<infer K, infer V>
+          ? FieldBP<WrapperBP<F[`__wrapperBrand`], F>, Decrement<Depth>>
+          : F extends TObject
+            ? ConstituentBP<F, Decrement<Depth>>
+            : BaseTransform<F, Decrement<Depth>>
+      : F extends (...args: any[]) => any
+        ? never // Filter functions
+        : F extends Wrapper<infer K, infer V>
+          ? FieldBP<WrapperBP<F[`__wrapperBrand`], F>, Decrement<Depth>>
+          : F extends TObject
+            ? TObjectOrEmptyBP<F, Decrement<Depth>>
+            : BaseTransform<F, Decrement<Depth>>
+    : never;
+
+// F extends (...args: any[]) => any
+//   ? never // Filter functions
+//   : F extends Wrapper<infer K, infer V>
+//     ? FieldBP<WrapperBP<F[`__wrapperBrand`], F>, Decrement<Depth>>
+//     : F extends TObject
+//       ? {
+//           [K in keyof F]: FieldBP<Freeze<F[K]>, Decrement<Depth>>;
+//         }
+//       : BaseTransform<F, Decrement<Depth>>;
+
+// type UnionFieldBP<F> = { unionDetected: true; value: F }
+// type NonUnionFieldBP<F> = { unionDetected: false; value: F }
+
+// type FieldBPOld<F, Depth extends number> = Depth extends never
+//   ? never
+//   : F extends (...args: any[]) => any
+//     ? never // Filter functions
+//     : F extends Wrapper<infer K, infer V>
+//       ? FieldBP<WrapperBP<F[`__wrapperBrand`], F>, Decrement<Depth>>
+//       : F extends TObject
+//         ? MaybeSumBP<[F], Decrement<Depth>>
+//         : BaseTransform<F, Decrement<Depth>>;
 
 type BaseTransform<T, Depth extends number> = T extends Uint8Array
   ? string
   : T extends bigint
     ? bigint
     : T extends Array<infer E>
-      ? Array<FieldBP<E, Decrement<Depth>>>
+      ? Array<FieldBP<Freeze<E>, Decrement<Depth>>>
       : T extends Map<infer K, infer V>
-        ? Map<FieldBP<K, Decrement<Depth>>, FieldBP<V, Decrement<Depth>>>
+        ? Map<
+            FieldBP<Freeze<K>, Decrement<Depth>>,
+            FieldBP<Freeze<V>, Decrement<Depth>>
+          >
         : T extends string
           ? UnOpaqueString<T>
           : // : T extends Record<string, infer F>
